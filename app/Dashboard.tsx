@@ -119,7 +119,7 @@ export default function Dashboard() {
           <span className="status-dot" />
           <div><b>デモデータで表示中</b><small>公的統計接続前のUI検証版</small></div>
         </div>
-        <div className="sidebar-footer">普通会計・決算統計ベース<br />Prototype v0.1</div>
+        <div className="sidebar-footer">普通会計・決算統計ベース<br />UI v0.2 · 指標解説を追加</div>
       </aside>
 
       <main>

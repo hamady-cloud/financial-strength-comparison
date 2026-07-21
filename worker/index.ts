@@ -40,7 +40,24 @@ const worker = {
       }, allowedWidths);
     }
 
-    return handler.fetch(request, env, ctx);
+    const response = await handler.fetch(request, env, ctx);
+
+    // Keep the application shell fresh after a deployment. Hashed JS/CSS assets
+    // remain cacheable, while HTML navigation always reflects the latest build.
+    const acceptsHtml = request.headers.get("accept")?.includes("text/html");
+    if (acceptsHtml) {
+      const headers = new Headers(response.headers);
+      headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+      headers.set("CDN-Cache-Control", "no-store");
+      headers.set("Pragma", "no-cache");
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    }
+
+    return response;
   },
 };
 

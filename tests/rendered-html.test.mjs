@@ -25,9 +25,10 @@ test("renders the fiscal dashboard shell", async () => {
 });
 
 test("keeps data and methodology labels explicit", async () => {
-  const [dashboard, data] = await Promise.all([
+  const [dashboard, data, worker] = await Promise.all([
     readFile(new URL("../app/Dashboard.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/data.ts", import.meta.url), "utf8"),
+    readFile(new URL("../worker/index.ts", import.meta.url), "utf8"),
   ]);
   assert.match(dashboard, /出典・注意/);
   assert.match(dashboard, /正確な値は必ず公表元/);
@@ -37,4 +38,5 @@ test("keeps data and methodology labels explicit", async () => {
   assert.match(dashboard, /読み間違いに注意/);
   assert.match(data, /和歌山市/);
   assert.match(data, /北山村/);
+  assert.match(worker, /no-store, no-cache, must-revalidate/);
 });
