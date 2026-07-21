@@ -32,6 +32,9 @@ test("keeps data and methodology labels explicit", async () => {
   assert.match(dashboard, /出典・注意/);
   assert.match(dashboard, /正確な値は必ず公表元/);
   assert.match(dashboard, /CSVを出力/);
+  assert.match(dashboard, /やさしい指標解説/);
+  assert.match(dashboard, /まちの大きな家計簿/);
+  assert.match(dashboard, /読み間違いに注意/);
   assert.match(data, /和歌山市/);
   assert.match(data, /北山村/);
 });

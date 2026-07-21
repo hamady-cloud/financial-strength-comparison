@@ -13,14 +13,15 @@ import {
   type Municipality,
 } from "./data";
 
-type View = "ranking" | "scatter" | "detail" | "wakayama" | "sources";
+type View = "ranking" | "scatter" | "detail" | "wakayama" | "guide" | "sources";
 
 const nav: { id: View; label: string; index: string }[] = [
   { id: "ranking", label: "全国ランキング", index: "01" },
   { id: "scatter", label: "指標マップ", index: "02" },
   { id: "detail", label: "団体カルテ", index: "03" },
   { id: "wakayama", label: "和歌山ビュー", index: "04" },
-  { id: "sources", label: "出典・注意", index: "05" },
+  { id: "guide", label: "やさしい指標解説", index: "05" },
+  { id: "sources", label: "出典・注意", index: "06" },
 ];
 
 function Trend({ values, good = false }: { values: number[]; good?: boolean }) {
@@ -134,9 +135,10 @@ export default function Dashboard() {
         {view === "scatter" && <Scatter xMetric={xMetric} setXMetric={setXMetric} yMetric={yMetric} setYMetric={setYMetric} search={search} setSearch={setSearch} openDetail={openDetail} />}
         {view === "detail" && <Detail selected={selected} setSelectedCode={setSelectedCode} metric={metric} setMetric={setMetric} />}
         {view === "wakayama" && <Wakayama openDetail={openDetail} />}
+        {view === "guide" && <BeginnerGuide />}
         {view === "sources" && <Sources />}
 
-        <footer className="main-footer"><span>本サイトは非公式の分析支援ツールです。正確な値は必ず公表元をご確認ください。</span><button onClick={() => setView("sources")}>出典・免責を見る →</button></footer>
+        <footer className="main-footer"><span>本サイトは非公式の分析支援ツールです。正確な値は必ず公表元をご確認ください。</span><div><button onClick={() => setView("guide")}>数値の読み方</button><button onClick={() => setView("sources")}>出典・免責を見る →</button></div></footer>
       </main>
     </div>
   );
@@ -219,6 +221,134 @@ function Wakayama({ openDetail }: { openDetail: (m: Municipality) => void }) {
     <div className="pref-hero"><div><span>和歌山県</span><h2>30市町村の財政を、一望する。</h2><p>色は県内での相対的な位置を示します。濃い色がただちに「危険」を意味するものではありません。</p></div><div className="pref-stat"><b>30</b><span>municipalities</span></div></div>
     <div className="wakayama-grid"><div className="table-card heatmap-card"><div className="table-head"><div><b>県内ヒートマップ</b><span>各指標の県内分布</span></div><div className="heat-legend"><span>良好</span><i className="heat-low" /><i className="heat-mid" /><i className="heat-high" /><span>注視</span></div></div><div className="table-scroll"><table className="heatmap"><thead><tr><th>団体</th>{keys.map((key) => <th key={key}>{metrics[key].label}</th>)}</tr></thead><tbody>{municipalities.map((m) => <tr key={m.code}><td><button className="entity" onClick={() => openDetail(m)}><b>{m.name}</b><small>{m.group}</small></button></td>{keys.map((key) => <td key={key}><span className={heatClass(m, key)}>{formatMetric(metricValue(m, key), key)}</span></td>)}</tr>)}</tbody></table></div></div>
       <aside className="trend-panel"><span className="eyebrow">3-YEAR CHANGE</span><h2>悪化幅の大きい団体</h2><p>経常収支比率が直近3年で上昇した順</p>{worst.map((m, i) => <button key={m.code} onClick={() => openDetail(m)}><span className="trend-rank">0{i + 1}</span><div><b>{m.name}</b><small>{m.cause}</small></div><strong>+{(m.trend[4] - m.trend[2]).toFixed(1)}<em>pt</em></strong></button>)}<div className="trend-note"><b>注目点</b><p>単年度の変化ではなく、費目別の寄与とあわせて確認してください。</p></div></aside></div>
+  </section>;
+}
+
+function BeginnerGuide() {
+  const guideMetrics = [
+    {
+      number: "01",
+      name: "財政力指数",
+      question: "自分たちで集められるお金で、必要な仕事をどれくらいまかなえる？",
+      simple: "まちの「自分でお金を用意する力」を見る数字です。国から配られる地方交付税に、どのくらい頼らずにすむかを考える手がかりになります。",
+      formulaTop: "基準財政収入額",
+      formulaBottom: "基準財政需要額",
+      suffix: "3年間の平均",
+      terms: "「収入額」は標準的に見込める税収など、「需要額」は標準的な行政サービスに必要とされる費用です。実際の歳入・歳出の総額そのものではありません。",
+      example: "収入額が70億円、必要額が100億円なら、70 ÷ 100 ＝ 0.70。3年分を平均して表示します。",
+      high: "高いほど、税収など自前のお金で対応できる割合が大きい傾向があります。",
+      low: "低いほど、地方交付税など国からの支えが重要になります。",
+      caution: "1.00未満だから直ちに危険、という意味ではありません。人口規模や産業構造が近い自治体と比べます。",
+    },
+    {
+      number: "02",
+      name: "経常収支比率",
+      question: "毎年自由に使えるお金のうち、固定費でどれくらい埋まっている？",
+      simple: "家計でいえば、毎月の給料のうち、家賃・食費・ローンなど毎月ほぼ必ず出ていくお金が占める割合です。まちの「お金の動かしやすさ」がわかります。",
+      formulaTop: "毎年続く経費に使った一般財源",
+      formulaBottom: "毎年入る、使い道が決まっていない一般財源",
+      suffix: "× 100",
+      terms: "一般財源とは、税金や地方交付税など、使い道を自治体が比較的自由に決められるお金です。",
+      example: "自由に使える収入が100億円、そのうち固定的な経費が92億円なら、92 ÷ 100 × 100 ＝ 92%。新しい仕事に回せる余地は単純化すると8%です。",
+      high: "高いほど固定費の割合が大きく、新しい事業や急な支出に対応しにくい傾向があります。",
+      low: "低いほど、政策や臨時の支出に回せる余地がある傾向があります。",
+      caution: "法律上の一律な危険ラインはありません。必要な福祉サービスが多いなど、高くなる理由を内訳で確認します。",
+    },
+    {
+      number: "03",
+      name: "実質公債費比率",
+      question: "1年間の収入規模に対して、借金返済の負担はどれくらい？",
+      simple: "まちのローン返済負担を見る数字です。一般会計の返済だけでなく、公営企業などの返済を実質的に負担している分も考えます。",
+      formulaTop: "その年に実質的に負担した借金返済額",
+      formulaBottom: "標準財政規模などをもとにした額",
+      suffix: "× 100・3年間の平均",
+      terms: "標準財政規模は、その自治体が標準的に持つ経常的な一般財源の大きさです。公式計算では、国から補われる返済財源などを調整します。",
+      example: "説明を簡単にして、収入規模が1,000億円、実質的な返済負担が120億円なら、120 ÷ 1,000 × 100 ＝ 12%。",
+      high: "高いほど借金返済の負担が重く、ほかの仕事に使えるお金が少なくなりやすいです。",
+      low: "低いほど、その年の収入に対する返済負担は小さい傾向があります。",
+      caution: "18%以上は地方債を発行するときに国の許可が必要となり、25%以上は早期健全化基準です。ただし、公式値は複数の調整を含みます。",
+    },
+    {
+      number: "04",
+      name: "将来負担比率",
+      question: "将来払う約束になっている負担は、今の収入規模に対してどれくらい？",
+      simple: "いま残っている借金や、将来負担する可能性が高い金額から、返済に使える基金などを差し引いて測ります。家計でいえば「住宅ローンなどの残高」と「返済用の貯金」をまとめて見るイメージです。",
+      formulaTop: "将来負担する額 − 返済に使える基金など",
+      formulaBottom: "標準財政規模などをもとにした額",
+      suffix: "× 100",
+      terms: "将来負担には地方債残高のほか、一部事務組合や第三セクターなどへの負担が含まれることがあります。",
+      example: "説明を簡単にして、差し引き後の将来負担が800億円、収入規模が1,000億円なら、800 ÷ 1,000 × 100 ＝ 80%。",
+      high: "高いほど、将来の世代が負担する可能性のある金額が大きい傾向があります。",
+      low: "低いほど、収入規模に対する将来負担は小さい傾向があります。負担額が基金などを下回る場合は「—」になることもあります。",
+      caution: "一般の市町村では350%が早期健全化基準です。政令指定都市などは扱いが異なるため、公式資料も確認します。",
+    },
+    {
+      number: "05",
+      name: "基金残高比率",
+      question: "もしもの時に使える貯金は、まちの収入規模に対してどれくらい？",
+      simple: "自治体の主な貯金である基金を、自治体の大きさに合わせて比べるための数字です。金額だけでは大都市が大きく見えるため、収入規模で割ります。",
+      formulaTop: "財政調整基金 ＋ 減債基金 ＋ その他特定目的基金",
+      formulaBottom: "標準財政規模",
+      suffix: "× 100",
+      terms: "財政調整基金は急な支出などに備える貯金、減債基金は借金返済のための貯金、特定目的基金は施設整備など目的を決めた貯金です。",
+      example: "基金が合計500億円、収入規模が1,000億円なら、500 ÷ 1,000 × 100 ＝ 50%。",
+      high: "高いほど、災害・税収減・大きな事業などに備える余力が厚い傾向があります。",
+      low: "低いほど、急な支出が起きたときの選択肢が限られやすくなります。",
+      caution: "これは本ツールの比較用指標で、法律上の健全化指標ではありません。基金には使い道が決まったものもあるため、全額を自由に使えるわけではありません。",
+    },
+    {
+      number: "06",
+      name: "経常収支比率の内訳",
+      question: "固定費が多いのは、人件費・福祉・借金返済のどれが主な理由？",
+      simple: "経常収支比率を費目別に分け、財政が動かしにくくなっている理由を探します。総合点だけでなく「なぜ高いのか」を説明するための数字です。",
+      formulaTop: "各費目に毎年使った一般財源",
+      formulaBottom: "毎年入る、使い道が決まっていない一般財源",
+      suffix: "× 100",
+      terms: "人件費は職員給与など、扶助費は生活・福祉の支援、公債費は借金返済です。このほか物件費や補助費などもあります。",
+      example: "自由に使える収入が100億円で、人件費に25億円なら人件費分は25%。扶助費30%、公債費20%などと分けて主因を探します。",
+      high: "ある費目が類似団体より高ければ、その費目が硬直化の主因である可能性があります。",
+      low: "低い費目だけを見て安心せず、ほかの費目やサービス内容も合わせて確認します。",
+      caution: "費用が高いことには理由があります。高齢化、施設数、行政区域の広さなど、地域事情を確認せずに良し悪しを決めないことが重要です。",
+    },
+  ];
+
+  const glossary = [
+    ["一般財源", "使い道が細かく決められておらず、自治体が比較的自由に使えるお金。地方税や地方交付税など。"],
+    ["標準財政規模", "その自治体が標準的な状態で持つ、毎年の一般財源のおおよその大きさ。自治体の規模をそろえて比べる物差し。"],
+    ["基金", "自治体の貯金。急な支出への備え、借金返済、施設整備など、目的によっていくつかの種類がある。"],
+    ["地方債", "道路や学校など長く使う施設を整備するときなどに、自治体が行う借金。将来の住民も返済を負担する。"],
+    ["普通会計", "自治体ごとに異なる会計を比べやすくするため、共通ルールで組み直した統計上の会計区分。"],
+    ["類似団体", "人口や産業構造などが近い自治体のグループ。条件の近いまち同士で公平に比べるために使う。"],
+  ];
+
+  return <section className="page guide-page">
+    <PageIntro eyebrow="FISCAL BASICS" title="やさしい指標解説" text="はじめて財政を見る人のために、計算方法と数字の意味を、身近な例で説明します。" />
+
+    <div className="guide-hero">
+      <div><span className="guide-kicker">まず、ここだけ覚えよう</span><h2>市町村の財政は、<br />「まちの大きな家計簿」です。</h2><p>市町村は、税金や国からのお金を受け取り、学校、道路、ごみ収集、消防、福祉などに使います。ただし、普通の家計と違い、利益を出すことが目的ではありません。住民に必要なサービスを続けながら、急な災害や将来の負担にも備える必要があります。</p></div>
+      <div className="household-map"><div><span>まちの収入</span><b>税金・地方交付税など</b><small>家計なら「給料」に近い</small></div><i>→</i><div><span>まちの支出</span><b>教育・福祉・道路など</b><small>家計なら「生活費」に近い</small></div><i>＋</i><div><span>将来への備え</span><b>基金・借金の管理</b><small>家計なら「貯金とローン」</small></div></div>
+    </div>
+
+    <div className="guide-warning"><span>大切</span><p><b>1つの数字だけで「良いまち・悪いまち」と決めないでください。</b>人口、産業、年齢構成、面積、必要な公共施設などで数字は変わります。「似た自治体との比較」「数年間の変化」「高くなった理由」の3つを合わせて読みます。</p></div>
+
+    <div className="reading-guide"><span className="eyebrow">HOW TO READ</span><h2>数字を見る4つの順番</h2><div><article><b>1</b><h3>同じ条件で比べる</h3><p>まず類似団体平均との差を見ます。人口の違う大都市と小さな町を、そのまま比べないためです。</p></article><article><b>2</b><h3>数年の流れを見る</h3><p>1年だけの上昇・低下に慌てず、3年・5年と続く変化かを確認します。</p></article><article><b>3</b><h3>複数の数字を組み合わせる</h3><p>借金が多くても基金が厚い場合があります。負担・余力・貯金をセットで見ます。</p></article><article><b>4</b><h3>理由を調べる</h3><p>高齢化、災害復旧、施設整備など、数字が動いた背景を決算資料で確認します。</p></article></div></div>
+
+    <div className="guide-section-head"><span className="eyebrow">SIX KEY METRICS</span><h2>6つの数字を、ひとつずつ理解する</h2><p>計算式は理解しやすい形に簡略化しています。実際の公式計算では、法令に基づく控除や調整が加わる場合があります。</p></div>
+
+    <div className="guide-metrics">{guideMetrics.map((item) => <article className="guide-metric-card" key={item.number}>
+      <header><span>{item.number}</span><div><small>この数字でわかること</small><h3>{item.name}</h3></div></header>
+      <p className="guide-question">「{item.question}」</p>
+      <p className="guide-simple">{item.simple}</p>
+      <div className="formula-box"><span className="formula-label">計算方法</span><div className="fraction"><b>{item.formulaTop}</b><i /><b>{item.formulaBottom}</b></div><strong>{item.suffix}</strong></div>
+      <p className="term-note"><b>ことばの補足</b>{item.terms}</p>
+      <div className="example-box"><span>たとえば</span><p>{item.example}</p></div>
+      <div className="direction-grid"><div><span className="up">高いとき</span><p>{item.high}</p></div><div><span className="down">低いとき</span><p>{item.low}</p></div></div>
+      <div className="guide-caution"><b>読み間違いに注意</b><p>{item.caution}</p></div>
+    </article>)}</div>
+
+    <div className="glossary"><div className="guide-section-head"><span className="eyebrow">GLOSSARY</span><h2>よく出てくる財政用語</h2><p>難しい言葉は、画面に戻る前にここで確認できます。</p></div><div className="glossary-grid">{glossary.map(([term, text]) => <article key={term}><h3>{term}</h3><p>{text}</p></article>)}</div></div>
+
+    <div className="guide-finish"><div><span>迷ったときの合言葉</span><h2>比べる・流れを見る・理由を探す</h2></div><p>財政指標は、自治体を採点するためではなく、詳しく調べる入口を見つけるための道具です。</p></div>
   </section>;
 }
 
