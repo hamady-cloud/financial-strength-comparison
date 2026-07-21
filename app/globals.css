@@ -190,6 +190,40 @@ th { color:#52656e;font-size:11px;font-weight:700; } td { font-size:13px; }.enti
 .demo-banner b { font-size:13px; }.demo-banner p { font-size:11px; }.source-table b { font-size:12px; }.source-table small,.source-table span,.source-table em,.update-card > b,.update-card p,.update-status { font-size:11px; }
 .definition-grid p { font-size:11px; }.limits-grid article > span { font-size:11px; }.limits-grid ul { font-size:12px; }.process > div span { font-size:11px; }
 
+/* Readability pass 2: stronger hierarchy and comfortable minimum text sizes */
+body { font-size:15px;font-weight:600; }
+.brand strong { font-size:21px;font-weight:700; }.brand small { font-size:12px;font-weight:600; }
+.sidebar nav button { font-size:15px;font-weight:700;padding:16px 14px; }.sidebar nav button span { font-size:11px;font-weight:700; }
+.sidebar-note b { font-size:13px;font-weight:800; }.sidebar-note small,.sidebar-footer { font-size:12px;font-weight:600; }
+.year-control { font-size:13px;font-weight:700; }.year-control select { font-size:14px;font-weight:800; }
+.page-intro h1 { font-weight:600; }.page-intro p { font-size:15px;font-weight:600;color:#405863; }
+.eyebrow { font-size:12px;font-weight:800; }.button { font-size:14px;font-weight:800; }
+.insight-strip small,.insight-strip span { font-size:12px;font-weight:600; }.insight-strip strong { font-weight:600; }.insight p { font-size:13px;font-weight:600; }.insight p b { font-size:14px;font-weight:800; }
+.filter-panel label,.chart-toolbar label { font-size:12px;font-weight:700; }.filter-panel select,.chart-toolbar select,.panel-title select,.search-field input { font-size:14px;font-weight:700; }
+.table-head b { font-size:16px;font-weight:800; }.table-head span { font-size:12px;font-weight:600; }.sort-button { font-size:12px;font-weight:700; }
+th { color:#3f5863;font-size:13px;font-weight:800;padding:13px 14px; } td { font-size:14px;font-weight:600;padding:14px; }
+.rank { width:30px;height:30px;font-size:13px;font-weight:700; }.entity b { font-size:15px;font-weight:800; }.entity small { font-size:11px;font-weight:600; }
+.tag { padding:5px 8px;font-size:11px;font-weight:800; }.delta { font-size:13px;font-weight:800; }.row-arrow { font-size:19px;font-weight:800; }
+.danger-zone span,.point span,.axis-label,.legend,.mini-stat span,.callout b,.callout span { font-size:12px;font-weight:700; }.map-insight > p { font-size:14px;font-weight:600; }
+.entity-picker label,.entity-picker > div { font-size:12px;font-weight:700; }.entity-picker select { font-size:17px;font-weight:800; }.profile-hero p { font-size:13px;font-weight:600; }
+.cause-badge span,.cause-badge small { font-size:11px;font-weight:600; }.cause-badge strong { font-weight:600; }
+.metric-card { padding:20px 18px; }.metric-card > div:first-child { font-size:13px;font-weight:700;align-items:center;gap:8px; }.metric-card > strong { font-size:28px;font-weight:700;margin:15px 0 10px; }.metric-card p { font-size:12px;font-weight:800;line-height:1.5; }
+.panel-title h3 { font-size:18px;font-weight:600; }.trend-columns span { font-size:12px;font-weight:700; }.trend-columns small,.composition-list p,.cause-note { font-size:12px;font-weight:600; }
+.pref-hero span,.pref-hero p { font-size:12px;font-weight:600; }.heatmap td > span { font-size:12px;font-weight:800; }.trend-panel > p,.trend-panel button small,.trend-note b,.trend-note p { font-size:12px;font-weight:600; }.trend-panel button b { font-size:13px;font-weight:800; }
+.demo-banner b { font-size:14px;font-weight:800; }.demo-banner p { font-size:13px;font-weight:600; }.source-table b { font-size:13px;font-weight:800; }.source-table small,.source-table span,.source-table em,.update-card > b,.update-card p,.update-status { font-size:12px;font-weight:600; }
+.definition-grid p { font-size:12px;font-weight:600; }.limits-grid article > span { font-size:12px;font-weight:800; }.limits-grid ul { font-size:13px;font-weight:600; }.process > div span { font-size:12px;font-weight:700; }
+.main-footer { font-size:12px;font-weight:600; }
+
+/* Contextual help popovers */
+.help-tip { display:inline-flex;align-items:center;line-height:1; }
+.help-trigger,.metric-card .help-trigger { display:grid;place-items:center;flex:0 0 auto;width:26px;height:26px;padding:0;border:1px solid #b8c7cc;border-radius:50%;background:#fff;color:#405b66;font-size:13px;font-weight:900;line-height:1;cursor:pointer;box-shadow:0 1px 2px rgba(18,54,74,.06); }
+.help-trigger:hover,.help-trigger[aria-expanded="true"] { border-color:var(--teal);background:var(--teal);color:#fff; }
+.help-tip.compact .help-trigger { width:24px;height:24px;font-size:12px; }
+.help-popover { position:fixed;z-index:1000;width:min(320px,calc(100vw - 24px));padding:17px 18px;background:var(--ink);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;box-shadow:0 18px 46px rgba(18,54,74,.28);line-height:1.75; }
+.help-popover > div { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:7px; }.help-popover strong { font-size:15px;font-weight:800;color:#fff; }.help-popover > div button { display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.1);color:#fff;font-size:20px;font-weight:700;cursor:pointer; }
+.help-popover p { margin:0;color:#dce7ea;font-size:13px;font-weight:600;line-height:1.8; }
+.group-tag-wrap,.header-with-help,.group-summary { display:inline-flex!important;align-items:center;gap:7px;white-space:nowrap; }.header-with-help { color:inherit; }.group-summary { margin-top:6px!important; }.heat-entity { display:grid;gap:7px;justify-items:start; }
+
 @media (max-width: 1100px) {
   .sidebar { width:210px; }.brand small { display:none; } main { margin-left:210px; }.page { padding:45px 28px 60px; }.topbar { padding:0 28px; }.filter-panel { grid-template-columns:repeat(2,1fr); }.search-field { grid-column:span 2; }.metric-grid { grid-template-columns:repeat(3,1fr); }.metric-card { border-bottom:1px solid var(--line); }.definition-grid { grid-template-columns:repeat(2,1fr); }.definition-grid article { border-bottom:1px solid var(--line); }.main-footer { padding-left:28px;padding-right:28px; }.guide-hero { grid-template-columns:1fr; }.reading-guide > div { grid-template-columns:repeat(2,1fr); }.reading-guide article:nth-child(2) { border-right:0; }.glossary-grid { grid-template-columns:repeat(2,1fr); }.glossary-grid article:nth-child(3n) { border-right:1px solid var(--line); }.glossary-grid article:nth-child(2n) { border-right:0; }
 }

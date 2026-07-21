@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   allMunicipalities,
   benchmarkFor,
@@ -148,6 +149,83 @@ function PageIntro({ eyebrow, title, text, action }: { eyebrow: string; title: s
   return <div className="page-intro"><div><span className="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{text}</p></div>{action}</div>;
 }
 
+const metricHelp: Record<MetricKey, string> = {
+  fiscalStrength: "必要な行政サービスにかかる標準的な費用を、その自治体の標準的な税収でどれだけまかなえるかを見る指標です。高いほど、自分たちの収入で行政を運営しやすい傾向があります。",
+  ordinaryBalance: "毎年自由に使える収入のうち、人件費・福祉・借金返済など、毎年続く支出に使う割合です。高いほど、新しい事業に回せるお金の余裕が小さい傾向があります。",
+  debtService: "自治体の収入規模に対して、実質的な借金返済の負担がどれくらいあるかを示す割合です。低いほど、返済負担が軽い傾向があります。",
+  futureBurden: "将来支払う可能性がある借金などの負担から、基金などを差し引き、自治体の収入規模と比べた指標です。低いほど、将来の負担が小さい傾向があります。",
+  fundBalance: "主な基金（自治体の貯金）を収入規模で割った、このツール独自の比較指標です。高いほど、災害や急な支出への備えが厚い傾向があります。",
+  personnel: "毎年自由に使える収入のうち、職員の給与など人件費に充てた割合です。単独で良し悪しを決めず、似た規模の自治体と比べて読みます。",
+};
+
+const groupHelp: Record<string, string> = {
+  政令市: "政令指定都市のことです。人口や行政規模が大きく、都道府県が行う仕事の一部も担う都市です。",
+  中核市: "人口規模が比較的大きく、保健所の設置など、一部の行政権限を都道府県から移された都市です。",
+  "都市Ⅱ": "人口や産業構造が近い「市」をまとめた類似団体区分の、このデモでの簡略表示です。「Ⅱ」は同じ市の中の規模帯を表します。",
+  "町村Ⅰ": "人口や産業構造が近い町・村をまとめた、このデモでの簡略区分です。「Ⅰ」は比較的小規模な町村グループを表します。",
+  "町村Ⅱ": "人口や産業構造が近い町・村をまとめた、このデモでの簡略区分です。「Ⅱ」はⅠより人口規模が大きい町村グループを表します。",
+};
+
+function HelpTip({ label, text, compact = false }: { label: string; text: string; compact?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const id = useId();
+
+  function toggle() {
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const width = Math.min(320, window.innerWidth - 24);
+      const left = Math.min(window.innerWidth - width - 12, Math.max(12, rect.right - width));
+      const showAbove = rect.bottom + 190 > window.innerHeight;
+      setPosition({ top: showAbove ? Math.max(12, rect.top - 174) : rect.bottom + 8, left });
+    }
+    setOpen((value) => !value);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    function closeOnOutside(event: PointerEvent) {
+      const target = event.target as Node;
+      if (!buttonRef.current?.contains(target) && !popoverRef.current?.contains(target)) setOpen(false);
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        buttonRef.current?.focus();
+      }
+    }
+    function closeOnViewportChange() { setOpen(false); }
+    document.addEventListener("pointerdown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("resize", closeOnViewportChange);
+    window.addEventListener("scroll", closeOnViewportChange, true);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("resize", closeOnViewportChange);
+      window.removeEventListener("scroll", closeOnViewportChange, true);
+    };
+  }, [open]);
+
+  return <span className={`help-tip ${compact ? "compact" : ""}`}>
+    <button ref={buttonRef} type="button" className="help-trigger" aria-label={`${label}の意味を表示`} aria-expanded={open} aria-controls={id} onClick={toggle}>?</button>
+    {open && typeof document !== "undefined" && createPortal(
+      <div ref={popoverRef} id={id} className="help-popover" role="dialog" aria-label={`${label}の説明`} style={position}>
+        <div><strong>{label}</strong><button type="button" aria-label="説明を閉じる" onClick={() => setOpen(false)}>×</button></div>
+        <p>{text}</p>
+      </div>,
+      document.body,
+    )}
+  </span>;
+}
+
+function GroupTag({ group, accent = false }: { group: string; accent?: boolean }) {
+  const explanation = groupHelp[group] ?? "人口や産業構造が近い自治体をまとめた比較グループです。この画面ではデモ用に簡略化した区分名を表示しています。";
+  return <span className="group-tag-wrap"><span className={`tag ${accent ? "accent" : ""}`}>{group}</span><HelpTip label={group} text={explanation} compact /></span>;
+}
+
 function Ranking(props: {
   rows: Municipality[]; metric: MetricKey; setMetric: (v: MetricKey) => void; pref: string; setPref: (v: string) => void; prefs: string[];
   group: string; setGroup: (v: string) => void; groups: string[]; population: number; setPopulation: (v: number) => void;
@@ -171,10 +249,10 @@ function Ranking(props: {
     </div>
     <div className="table-card">
       <div className="table-head"><div><b>{metrics[metric].label}ランキング</b><span>比較条件に該当する団体</span></div><button className="sort-button" onClick={() => props.setDescending(!props.descending)}>{props.descending ? "高い順 ↓" : "低い順 ↑"}</button></div>
-      <div className="table-scroll"><table><thead><tr><th>順位</th><th>団体</th><th>類似区分</th><th>指標値</th><th>類似団体平均との差</th><th>前年度比</th><th>5年トレンド</th><th /></tr></thead>
+      <div className="table-scroll"><table><thead><tr><th>順位</th><th>団体</th><th><span className="header-with-help">類似区分<HelpTip label="類似団体区分" text="人口や産業構造が近い自治体をまとめた比較グループです。この画面では、分かりやすさのためデモ用の簡略名を表示しています。" compact /></span></th><th>指標値</th><th>類似団体平均との差</th><th>前年度比</th><th>5年トレンド</th><th /></tr></thead>
         <tbody>{rows.slice(0, 50).map((m, i) => {
           const value = metricValue(m, metric); const diff = value - benchmarkFor(m, metric); const yoy = m.trend[4] - m.trend[3];
-          return <tr key={m.code}><td><span className={`rank ${i < 3 ? "top" : ""}`}>{i + 1}</span></td><td><button className="entity" onClick={() => props.openDetail(m)}><b>{m.name}</b><small>{m.pref} · {m.population.toLocaleString()}人</small></button></td><td><span className="tag">{m.group}</span></td><td><strong>{formatMetric(value, metric)}</strong></td><td><span className={diff > 0 ? "delta bad" : "delta good"}>{diff > 0 ? "+" : ""}{diff.toFixed(metrics[metric].digits)}{metrics[metric].unit}</span></td><td><span className={yoy > 0 ? "delta bad" : "delta good"}>{yoy > 0 ? "▲" : "▼"} {Math.abs(yoy).toFixed(1)}</span></td><td><Trend values={m.trend} good={m.trend[4] <= m.trend[0]} /></td><td><button className="row-arrow" aria-label={`${m.name}の詳細`} onClick={() => props.openDetail(m)}>→</button></td></tr>;
+          return <tr key={m.code}><td><span className={`rank ${i < 3 ? "top" : ""}`}>{i + 1}</span></td><td><button className="entity" onClick={() => props.openDetail(m)}><b>{m.name}</b><small>{m.pref} · {m.population.toLocaleString()}人</small></button></td><td><GroupTag group={m.group} /></td><td><strong>{formatMetric(value, metric)}</strong></td><td><span className={diff > 0 ? "delta bad" : "delta good"}>{diff > 0 ? "+" : ""}{diff.toFixed(metrics[metric].digits)}{metrics[metric].unit}</span></td><td><span className={yoy > 0 ? "delta bad" : "delta good"}>{yoy > 0 ? "▲" : "▼"} {Math.abs(yoy).toFixed(1)}</span></td><td><Trend values={m.trend} good={m.trend[4] <= m.trend[0]} /></td><td><button className="row-arrow" aria-label={`${m.name}の詳細`} onClick={() => props.openDetail(m)}>→</button></td></tr>;
         })}</tbody></table>{rows.length === 0 && <div className="empty">条件に合う団体がありません。フィルタを変更してください。</div>}</div>
     </div>
   </section>;
@@ -203,12 +281,12 @@ function Detail({ selected, setSelectedCode, metric, setMetric }: { selected: Mu
   const cards: MetricKey[] = ["fiscalStrength", "ordinaryBalance", "debtService", "futureBurden", "fundBalance", "personnel"];
   return <section className="page">
     <PageIntro eyebrow="MUNICIPALITY PROFILE" title="団体カルテ" text="1団体の水準・変化・要因を、一枚で説明できる形にまとめます。" />
-    <div className="entity-picker"><label><span>対象団体</span><select value={selected.code} onChange={(e) => setSelectedCode(e.target.value)}>{allMunicipalities.map((m) => <option key={m.code} value={m.code}>{m.pref}　{m.name}</option>)}</select></label><div><span className="tag accent">{selected.group}</span><span>{selected.population.toLocaleString()}人</span><span>団体コード {selected.code}</span></div></div>
+    <div className="entity-picker"><label><span>対象団体</span><select value={selected.code} onChange={(e) => setSelectedCode(e.target.value)}>{allMunicipalities.map((m) => <option key={m.code} value={m.code}>{m.pref}　{m.name}</option>)}</select></label><div><GroupTag group={selected.group} accent /><span>{selected.population.toLocaleString()}人</span><span>団体コード {selected.code}</span></div></div>
     <div className="profile-hero"><div><span className="eyebrow">FISCAL SNAPSHOT</span><h2>{selected.name}</h2><p>{selected.pref}における経常収支比率順位 <b>{prefRank}位</b> ／ デモ収録全国順位 <b>{nationalRank}位</b></p></div><div className="cause-badge"><span>硬直化の主因</span><strong>{selected.cause}</strong><small>経常経費の構成比から判定</small></div></div>
-    <div className="metric-grid">{cards.map((key) => { const v = metricValue(selected, key); const diff = v - benchmarkFor(selected, key); const isBad = metrics[key].better === "low" ? diff > 0 : diff < 0; return <div className="metric-card" key={key}><div><span>{metrics[key].label}</span><button aria-label={`${metrics[key].label}の説明`}>?</button></div><strong>{formatMetric(v, key)}</strong><p className={isBad ? "bad-text" : "good-text"}>類似団体平均 {diff > 0 ? "+" : ""}{diff.toFixed(metrics[key].digits)}{metrics[key].unit}</p><div className="range"><i style={{ width: `${Math.min(100, Math.max(8, (v / (key === "fiscalStrength" ? 1.8 : key === "futureBurden" ? 280 : 140)) * 100))}%` }} /></div></div>; })}</div>
+    <div className="metric-grid">{cards.map((key) => { const v = metricValue(selected, key); const diff = v - benchmarkFor(selected, key); const isBad = metrics[key].better === "low" ? diff > 0 : diff < 0; return <div className="metric-card" key={key}><div><span>{metrics[key].label}</span><HelpTip label={metrics[key].label} text={metricHelp[key]} /></div><strong>{formatMetric(v, key)}</strong><p className={isBad ? "bad-text" : "good-text"}>類似団体平均 {diff > 0 ? "+" : ""}{diff.toFixed(metrics[key].digits)}{metrics[key].unit}</p><div className="range"><i style={{ width: `${Math.min(100, Math.max(8, (v / (key === "fiscalStrength" ? 1.8 : key === "futureBurden" ? 280 : 140)) * 100))}%` }} /></div></div>; })}</div>
     <div className="detail-grid"><div className="panel"><div className="panel-title"><div><span className="eyebrow">10-YEAR TREND</span><h3>指標の推移</h3></div><select value={metric} onChange={(e) => setMetric(e.target.value as MetricKey)}>{Object.entries(metrics).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></div><div className="line-chart"><div className="grid-lines" /><div className="trend-columns">{selected.trend.map((v, i) => <div key={i}><span style={{ bottom: `${18 + ((v - Math.min(...selected.trend)) / (Math.max(...selected.trend) - Math.min(...selected.trend) || 1)) * 62}%` }}>{v}</span><i style={{ height: `${18 + ((v - Math.min(...selected.trend)) / (Math.max(...selected.trend) - Math.min(...selected.trend) || 1)) * 62}%` }} /><small>{2019 + i}</small></div>)}</div></div></div>
       <div className="panel"><div className="panel-title"><div><span className="eyebrow">COMPOSITION</span><h3>経常収支比率の内訳</h3></div></div><div className="composition"><div className="donut"><b>{selected.ordinaryBalance}</b><span>%</span></div><div className="composition-list"><p><span><i style={{ background: "#12364a" }} />人件費</span><b>{selected.personnel}%</b></p><p><span><i style={{ background: "#1b8a88" }} />扶助費</span><b>{(selected.ordinaryBalance * .31).toFixed(1)}%</b></p><p><span><i style={{ background: "#e1765d" }} />公債費</span><b>{(selected.ordinaryBalance * .22).toFixed(1)}%</b></p><p><span><i style={{ background: "#d8c8a9" }} />その他</span><b>{Math.max(0, selected.ordinaryBalance - selected.personnel - selected.ordinaryBalance * .53).toFixed(1)}%</b></p></div></div><div className="cause-note"><b>{selected.cause}</b><span>同区分の構成比と比較し、寄与の大きい費目を表示しています。</span></div></div></div>
-    <div className="table-card compact-table"><div className="table-head"><div><b>類似団体との比較</b><span>{selected.group} · {peerRows.length}団体</span></div></div><div className="table-scroll"><table><thead><tr><th>団体</th><th>財政力指数</th><th>経常収支比率</th><th>実質公債費比率</th><th>基金残高比率</th></tr></thead><tbody>{peerRows.slice(0, 6).map((m) => <tr key={m.code} className={m.code === selected.code ? "selected-row" : ""}><td><b>{m.name}</b></td><td>{m.fiscalStrength.toFixed(2)}</td><td>{m.ordinaryBalance.toFixed(1)}%</td><td>{m.debtService.toFixed(1)}%</td><td>{m.fundBalance.toFixed(1)}%</td></tr>)}</tbody></table></div></div>
+    <div className="table-card compact-table"><div className="table-head"><div><b>類似団体との比較</b><span className="group-summary"><GroupTag group={selected.group} />{peerRows.length}団体</span></div></div><div className="table-scroll"><table><thead><tr><th>団体</th><th>財政力指数</th><th>経常収支比率</th><th>実質公債費比率</th><th>基金残高比率</th></tr></thead><tbody>{peerRows.slice(0, 6).map((m) => <tr key={m.code} className={m.code === selected.code ? "selected-row" : ""}><td><b>{m.name}</b></td><td>{m.fiscalStrength.toFixed(2)}</td><td>{m.ordinaryBalance.toFixed(1)}%</td><td>{m.debtService.toFixed(1)}%</td><td>{m.fundBalance.toFixed(1)}%</td></tr>)}</tbody></table></div></div>
   </section>;
 }
 
@@ -219,7 +297,7 @@ function Wakayama({ openDetail }: { openDetail: (m: Municipality) => void }) {
   return <section className="page">
     <PageIntro eyebrow="WAKAYAMA FOCUS" title="和歌山ビュー" text="県内30市町村を同じ物差しで見渡し、変化の大きい団体を抽出します。" action={<DownloadButton rows={municipalities} metric="ordinaryBalance" />} />
     <div className="pref-hero"><div><span>和歌山県</span><h2>30市町村の財政を、一望する。</h2><p>色は県内での相対的な位置を示します。濃い色がただちに「危険」を意味するものではありません。</p></div><div className="pref-stat"><b>30</b><span>municipalities</span></div></div>
-    <div className="wakayama-grid"><div className="table-card heatmap-card"><div className="table-head"><div><b>県内ヒートマップ</b><span>各指標の県内分布</span></div><div className="heat-legend"><span>良好</span><i className="heat-low" /><i className="heat-mid" /><i className="heat-high" /><span>注視</span></div></div><div className="table-scroll"><table className="heatmap"><thead><tr><th>団体</th>{keys.map((key) => <th key={key}>{metrics[key].label}</th>)}</tr></thead><tbody>{municipalities.map((m) => <tr key={m.code}><td><button className="entity" onClick={() => openDetail(m)}><b>{m.name}</b><small>{m.group}</small></button></td>{keys.map((key) => <td key={key}><span className={heatClass(m, key)}>{formatMetric(metricValue(m, key), key)}</span></td>)}</tr>)}</tbody></table></div></div>
+    <div className="wakayama-grid"><div className="table-card heatmap-card"><div className="table-head"><div><b>県内ヒートマップ</b><span>各指標の県内分布</span></div><div className="heat-legend"><span>良好</span><i className="heat-low" /><i className="heat-mid" /><i className="heat-high" /><span>注視</span></div></div><div className="table-scroll"><table className="heatmap"><thead><tr><th>団体</th>{keys.map((key) => <th key={key}>{metrics[key].label}</th>)}</tr></thead><tbody>{municipalities.map((m) => <tr key={m.code}><td><div className="heat-entity"><button className="entity" onClick={() => openDetail(m)}><b>{m.name}</b></button><GroupTag group={m.group} /></div></td>{keys.map((key) => <td key={key}><span className={heatClass(m, key)}>{formatMetric(metricValue(m, key), key)}</span></td>)}</tr>)}</tbody></table></div></div>
       <aside className="trend-panel"><span className="eyebrow">3-YEAR CHANGE</span><h2>悪化幅の大きい団体</h2><p>経常収支比率が直近3年で上昇した順</p>{worst.map((m, i) => <button key={m.code} onClick={() => openDetail(m)}><span className="trend-rank">0{i + 1}</span><div><b>{m.name}</b><small>{m.cause}</small></div><strong>+{(m.trend[4] - m.trend[2]).toFixed(1)}<em>pt</em></strong></button>)}<div className="trend-note"><b>注目点</b><p>単年度の変化ではなく、費目別の寄与とあわせて確認してください。</p></div></aside></div>
   </section>;
 }
