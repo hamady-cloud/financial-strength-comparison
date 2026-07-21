@@ -21,15 +21,16 @@ import {
   type Municipality,
 } from "./data";
 
-type View = "ranking" | "scatter" | "detail" | "wakayama" | "guide" | "sources";
+type View = "ranking" | "scatter" | "detail" | "wakayama" | "guide" | "risk" | "sources";
 
 const nav: { id: View; label: string; index: string }[] = [
   { id: "ranking", label: "全国ランキング", index: "01" },
   { id: "scatter", label: "指標マップ", index: "02" },
   { id: "detail", label: "団体カルテ", index: "03" },
-  { id: "wakayama", label: "和歌山ビュー", index: "04" },
+  { id: "wakayama", label: "都道府県ビュー", index: "04" },
   { id: "guide", label: "やさしい指標解説", index: "05" },
-  { id: "sources", label: "出典・注意", index: "06" },
+  { id: "risk", label: "財政悪化でどうなる？", index: "06" },
+  { id: "sources", label: "出典・注意", index: "07" },
 ];
 
 function Trend({ values, good = false }: { values: Array<number | null>; good?: boolean }) {
@@ -73,6 +74,7 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [scatterSearch, setScatterSearch] = useState("");
   const [scatterPref, setScatterPref] = useState("すべて");
+  const [focusPref, setFocusPref] = useState("和歌山県");
   const [selectedCode, setSelectedCode] = useState("30201");
   const [xMetric, setXMetric] = useState<MetricKey>("ordinaryBalance");
   const [yMetric, setYMetric] = useState<MetricKey>("futureBurden");
@@ -90,6 +92,8 @@ export default function Dashboard() {
     if (years.includes(requestedYear)) setYear(requestedYear);
     const municipality = params.get("municipality");
     if (municipality && allMunicipalities.some((item) => item.code === municipality)) setSelectedCode(municipality);
+    const requestedPref = params.get("prefecture");
+    if (requestedPref && allMunicipalities.some((item) => item.pref === requestedPref)) setFocusPref(requestedPref);
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -99,8 +103,9 @@ export default function Dashboard() {
     params.set("year", String(year));
     params.set("metric", metric);
     if (view === "detail") params.set("municipality", selectedCode);
+    if (view === "wakayama") params.set("prefecture", focusPref);
     window.history.replaceState(null, "", `?${params.toString()}`);
-  }, [view, year, metric, selectedCode]);
+  }, [view, year, metric, selectedCode, focusPref]);
 
   const prefs = useMemo(() => ["すべて", ...Array.from(new Set(allMunicipalities.map((m) => m.pref)))], []);
   const groups = useMemo(() => ["すべて", ...Array.from(new Set(allMunicipalities.map((m) => groupAt(m, year))))], [year]);
@@ -149,8 +154,9 @@ export default function Dashboard() {
         {view === "ranking" && <Ranking rows={filtered} year={year} metric={metric} setMetric={setMetric} pref={pref} setPref={setPref} prefs={prefs} group={group} setGroup={setGroup} groups={groups} population={population} setPopulation={setPopulation} descending={descending} setDescending={setDescending} search={search} setSearch={setSearch} openDetail={openDetail} />}
         {view === "scatter" && <Scatter year={year} xMetric={xMetric} setXMetric={setXMetric} yMetric={yMetric} setYMetric={setYMetric} pref={scatterPref} setPref={setScatterPref} prefs={prefs} search={scatterSearch} setSearch={setScatterSearch} openDetail={openDetail} />}
         {view === "detail" && <Detail year={year} selected={selected} setSelectedCode={setSelectedCode} metric={metric} setMetric={setMetric} />}
-        {view === "wakayama" && <Wakayama year={year} openDetail={openDetail} />}
+        {view === "wakayama" && <PrefectureView year={year} pref={focusPref} setPref={setFocusPref} prefs={prefs.filter((item) => item !== "すべて")} openDetail={openDetail} />}
         {view === "guide" && <BeginnerGuide />}
+        {view === "risk" && <FiscalRiskGuide />}
         {view === "sources" && <Sources />}
 
         <footer className="main-footer"><span>本サイトは非公式の分析支援ツールです。正確な値は必ず公表元をご確認ください。</span><div><button onClick={() => setView("guide")}>数値の読み方</button><button onClick={() => setView("sources")}>出典・免責を見る →</button></div></footer>
@@ -328,17 +334,18 @@ function Detail({ year, selected, setSelectedCode, metric, setMetric }: { year: 
   </section>;
 }
 
-function Wakayama({ year, openDetail }: { year: number; openDetail: (m: Municipality) => void }) {
+function PrefectureView({ year, pref, setPref, prefs, openDetail }: { year: number; pref: string; setPref: (v: string) => void; prefs: string[]; openDetail: (m: Municipality) => void }) {
   const keys: MetricKey[] = ["fiscalStrength", "ordinaryBalance", "debtService", "futureBurden", "fundBalance"];
+  const rows = allMunicipalities.filter((item) => item.pref === pref);
   const currentIndex = indexForYear(year);
   const changeFromIndex = Math.max(0, currentIndex - 2);
   const changeFor = (item: Municipality) => { const current = item.history.ordinaryBalance[currentIndex]; const previous = item.history.ordinaryBalance[changeFromIndex]; return current != null && previous != null ? current - previous : null; };
-  const worst = [...municipalities].filter((item) => changeFor(item) != null).sort((a, b) => (changeFor(b) ?? 0) - (changeFor(a) ?? 0)).slice(0, 4);
-  function heatClass(m: Municipality, key: MetricKey) { const vals = municipalities.map((x) => metricValue(x, key, year)).filter((value): value is number => value != null).sort((a, b) => a - b); const value = metricValue(m, key, year); if (value == null) return "heat-none"; const rank = vals.indexOf(value) / Math.max(vals.length, 1); const badness = metrics[key].better === "low" ? rank : 1 - rank; return badness > .72 ? "heat-high" : badness > .38 ? "heat-mid" : "heat-low"; }
+  const worst = [...rows].filter((item) => changeFor(item) != null).sort((a, b) => (changeFor(b) ?? 0) - (changeFor(a) ?? 0)).slice(0, 4);
+  function heatClass(m: Municipality, key: MetricKey) { const vals = rows.map((x) => metricValue(x, key, year)).filter((value): value is number => value != null).sort((a, b) => a - b); const value = metricValue(m, key, year); if (value == null) return "heat-none"; const rank = vals.indexOf(value) / Math.max(vals.length, 1); const badness = metrics[key].better === "low" ? rank : 1 - rank; return badness > .72 ? "heat-high" : badness > .38 ? "heat-mid" : "heat-low"; }
   return <section className="page">
-    <PageIntro eyebrow="WAKAYAMA FOCUS" title="和歌山ビュー" text={`${year}年度の県内30市町村を正式区分・公式値で見渡します。`} action={<DownloadButton rows={municipalities} metric="ordinaryBalance" year={year} />} />
-    <div className="pref-hero"><div><span>和歌山県 · {year}年度</span><h2>30市町村の財政を、一望する。</h2><p>色は県内での相対的な位置を示します。濃い色がただちに「危険」を意味するものではありません。</p></div><div className="pref-stat"><b>30</b><span>municipalities</span></div></div>
-    <div className="wakayama-grid"><div className="table-card heatmap-card"><div className="table-head"><div><b>県内ヒートマップ</b><span>各指標の県内分布</span></div><div className="heat-legend"><span>良好</span><i className="heat-low" /><i className="heat-mid" /><i className="heat-high" /><span>注視</span></div></div><div className="table-scroll"><table className="heatmap"><thead><tr><th>団体</th>{keys.map((key) => <th key={key}>{metrics[key].label}</th>)}</tr></thead><tbody>{municipalities.map((m) => <tr key={m.code}><td><div className="heat-entity"><button className="entity" onClick={() => openDetail(m)}><b>{m.name}</b></button><GroupTag group={groupAt(m, year)} /></div></td>{keys.map((key) => <td key={key}><span className={heatClass(m, key)}>{formatMetric(metricValue(m, key, year), key)}</span></td>)}</tr>)}</tbody></table></div></div>
+    <PageIntro eyebrow="PREFECTURE FOCUS" title="都道府県ビュー" text={`${year}年度の${pref}内${rows.length}市区町村を、正式区分・公式値で見渡します。`} action={<div className="pref-view-actions"><label><span>都道府県を選ぶ</span><select value={pref} onChange={(e) => setPref(e.target.value)}>{prefs.map((item) => <option key={item}>{item}</option>)}</select></label><DownloadButton rows={rows} metric="ordinaryBalance" year={year} /></div>} />
+    <div className="pref-hero"><div><span>{pref} · {year}年度</span><h2>{rows.length}市区町村の財政を、一望する。</h2><p>色は選択した都道府県内での相対的な位置です。濃い色がただちに「危険」を意味するものではありません。</p></div><div className="pref-stat"><b>{rows.length}</b><span>municipalities</span></div></div>
+    <div className="wakayama-grid"><div className="table-card heatmap-card"><div className="table-head"><div><b>都道府県内ヒートマップ</b><span>各指標の域内分布</span></div><div className="heat-legend"><span>良好</span><i className="heat-low" /><i className="heat-mid" /><i className="heat-high" /><span>注視</span></div></div><div className="table-scroll"><table className="heatmap"><thead><tr><th>団体</th>{keys.map((key) => <th key={key}>{metrics[key].label}</th>)}</tr></thead><tbody>{rows.map((m) => <tr key={m.code}><td><div className="heat-entity"><button className="entity" onClick={() => openDetail(m)}><b>{m.name}</b></button><GroupTag group={groupAt(m, year)} /></div></td>{keys.map((key) => <td key={key}><span className={heatClass(m, key)}>{formatMetric(metricValue(m, key, year), key)}</span></td>)}</tr>)}</tbody></table></div></div>
       <aside className="trend-panel"><span className="eyebrow">3-YEAR CHANGE</span><h2>悪化幅の大きい団体</h2><p>経常収支比率が{years[changeFromIndex]}年度から上昇した順</p>{worst.map((m, i) => <button key={m.code} onClick={() => openDetail(m)}><span className="trend-rank">0{i + 1}</span><div><b>{m.name}</b><small>{causeAt(m, year)}</small></div><strong>{(changeFor(m) ?? 0) > 0 ? "+" : ""}{(changeFor(m) ?? 0).toFixed(1)}<em>pt</em></strong></button>)}<div className="trend-note"><b>注目点</b><p>単年度の変化ではなく、費目別の寄与とあわせて確認してください。</p></div></aside></div>
   </section>;
 }
@@ -468,6 +475,40 @@ function BeginnerGuide() {
     <div className="glossary"><div className="guide-section-head"><span className="eyebrow">GLOSSARY</span><h2>よく出てくる財政用語</h2><p>難しい言葉は、画面に戻る前にここで確認できます。</p></div><div className="glossary-grid">{glossary.map(([term, text]) => <article key={term}><h3>{term}</h3><p>{text}</p></article>)}</div></div>
 
     <div className="guide-finish"><div><span>迷ったときの合言葉</span><h2>比べる・流れを見る・理由を探す</h2></div><p>財政指標は、自治体を採点するためではなく、詳しく調べる入口を見つけるための道具です。</p></div>
+  </section>;
+}
+
+function FiscalRiskGuide() {
+  const thresholds = [
+    { name: "実質赤字比率", meaning: "一般会計などの1年分の赤字が、まちの標準的な収入に対してどれくらいか", yellow: <>市町村 <b>11.25～15%</b><br />都道府県 3.75%</>, red: <>市町村 <b>20%</b><br />都道府県 5%</> },
+    { name: "連結実質赤字比率", meaning: "一般会計だけでなく、国民健康保険や公営企業なども合わせた赤字の大きさ", yellow: <>市町村 <b>16.25～20%</b><br />都道府県 8.75%</>, red: <>市町村 <b>30%</b><br />都道府県 15%</> },
+    { name: "実質公債費比率", meaning: "毎年の収入のうち、借金返済などに使う割合（3年間の平均）", yellow: <><b>25%</b></>, red: <><b>35%</b></> },
+    { name: "将来負担比率", meaning: "借金や将来支払う約束が、まちの収入規模の何年分に近いかを見る目安", yellow: <>市町村 <b>350%</b><br />都道府県・政令市 400%</>, red: <>設定なし</> },
+  ];
+  return <section className="page risk-page">
+    <PageIntro eyebrow="FISCAL HEALTH LAW" title="財政が悪いと、どうなる？" text="財政健全化法の『イエローカード』と『レッドカード』を、中学生にもわかる言葉で説明します。" />
+
+    <div className="risk-hero">
+      <div><span>まず結論</span><h2>基準を超えると、<br />法律に沿った立て直しが始まります。</h2><p>自治体が突然なくなったり、次の日からすべてのサービスが止まったりする制度ではありません。数字を公表し、原因を調べ、議会で計画を決めて、毎年の進み具合を住民に知らせながら改善します。</p></div>
+      <div className="risk-flow"><div><small>通常</small><b>毎年チェック</b><p>4つの比率を議会と住民に公表</p></div><i>→</i><div className="yellow"><small>イエロー</small><b>早期健全化</b><p>自分たちで計画的に立て直す</p></div><i>→</i><div className="red"><small>レッド</small><b>財政再生</b><p>国の強い関与のもとで再生する</p></div></div>
+    </div>
+
+    <div className="risk-key"><span>ここは大事</span><div><b>この法律の比率は、基本的に高いほど要注意です。</b><p>「基準を下回ると危ない」のではなく、表にある数値と同じか、それより高くなると法律上の手続きが始まります。</p></div></div>
+
+    <div className="risk-section-head"><span className="eyebrow">LEGAL THRESHOLDS</span><h2>どの数値でイエロー・レッドになる？</h2><p>イエローは4つの健全化判断比率のうち1つでも基準以上になると対象です。レッドは将来負担比率を除く3つのうち1つでも基準以上になると対象です。赤字比率のイエロー基準に幅があるのは、自治体の財政規模によって計算結果が変わるためです。</p></div>
+    <div className="table-card risk-table-card"><div className="table-scroll"><table className="risk-threshold-table"><thead><tr><th>法律上の指標</th><th>かんたんな意味</th><th>早期健全化基準<br />イエロー</th><th>財政再生基準<br />レッド</th></tr></thead><tbody>{thresholds.map((item) => <tr key={item.name}><td><b>{item.name}</b></td><td>{item.meaning}</td><td className="yellow-cell">{item.yellow}</td><td className="red-cell">{item.red}</td></tr>)}</tbody></table></div></div>
+    <p className="risk-table-note">※ 公営企業（水道・下水道など）は、資金不足比率が <b>20%以上</b> になると「経営健全化計画」が必要です。将来負担比率にはレッド基準がありません。</p>
+
+    <div className="risk-outcomes">
+      <article className="yellow"><span>イエローカード</span><h2>早期健全化団体になると</h2><p>まだ自分たちで立て直す段階ですが、法律により次の対応が必要になります。</p><ul><li><b>財政健全化計画</b>を作り、議会で決めて公表する</li><li>計画を総務大臣または都道府県知事へ報告する</li><li>毎年、計画の進み具合を議会と住民へ報告する</li><li>外部の専門家による監査を受ける</li></ul></article>
+      <article className="red"><span>レッドカード</span><h2>財政再生団体になると</h2><p>国の関与がより強くなり、自由に予算や借金を決めにくくなります。</p><ul><li><b>財政再生計画</b>を作り、議会で決めて公表する</li><li>総務大臣と協議し、計画への同意を求められる</li><li>同意がなければ、災害復旧などを除き、原則として新しい地方債を発行できない</li><li>必要に応じて、国から予算変更などの勧告を受ける</li></ul></article>
+    </div>
+
+    <div className="life-impact"><div><span className="eyebrow">FOR DAILY LIFE</span><h2>住民の暮らしには、どう関係する？</h2><p>法律が「このサービスを必ず削る」と一律に決めるわけではありません。ただし、限られたお金で赤字や借金を減らす必要があるため、計画を作る中で次の見直しが検討されることがあります。</p></div><div className="life-impact-grid"><article><b>事業の優先順位</b><p>新しい施設や工事を延期し、本当に急ぐものから行う。</p></article><article><b>サービスと料金</b><p>事業の内容、利用料や手数料を見直す。ただし自動的に値上げされるわけではありません。</p></article><article><b>役所の運営費</b><p>組織、職員配置、委託費などを見直し、支出を抑える。</p></article></div></div>
+
+    <div className="risk-clarifications"><article><h3>経常収支比率が100%を超えたらレッド？</h3><p><b>いいえ。</b> 経常収支比率は重要な注意信号ですが、財政健全化法のイエロー・レッドを直接決める4指標ではありません。</p></article><article><h3>このアプリだけで判定できる？</h3><p><b>できません。</b> このアプリには実質公債費比率と将来負担比率がありますが、実質赤字比率・連結実質赤字比率なども含めて、公表元の資料で確認する必要があります。</p></article></div>
+
+    <div className="legal-sources"><div><span className="eyebrow">OFFICIAL SOURCES</span><h2>法律・基準の確認先</h2><p>基準は2026年7月21日時点の現行制度を確認しています。実際の判定は、各自治体が監査を経て公表する健全化判断比率をご確認ください。</p></div><div><a href="https://laws.e-gov.go.jp/law/419AC0000000094" target="_blank" rel="noreferrer">e-Gov「地方公共団体の財政の健全化に関する法律」↗</a><a href="https://laws.e-gov.go.jp/law/419CO0000000397" target="_blank" rel="noreferrer">e-Gov「同法施行令」↗</a></div></div>
   </section>;
 }
 
