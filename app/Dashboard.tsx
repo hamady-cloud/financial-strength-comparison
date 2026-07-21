@@ -71,6 +71,8 @@ export default function Dashboard() {
   const [population, setPopulation] = useState(0);
   const [descending, setDescending] = useState(true);
   const [search, setSearch] = useState("");
+  const [scatterSearch, setScatterSearch] = useState("");
+  const [scatterPref, setScatterPref] = useState("すべて");
   const [selectedCode, setSelectedCode] = useState("30201");
   const [xMetric, setXMetric] = useState<MetricKey>("ordinaryBalance");
   const [yMetric, setYMetric] = useState<MetricKey>("futureBurden");
@@ -145,7 +147,7 @@ export default function Dashboard() {
         <div className="mobile-nav">{nav.map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => setView(item.id)}>{item.label}</button>)}</div>
 
         {view === "ranking" && <Ranking rows={filtered} year={year} metric={metric} setMetric={setMetric} pref={pref} setPref={setPref} prefs={prefs} group={group} setGroup={setGroup} groups={groups} population={population} setPopulation={setPopulation} descending={descending} setDescending={setDescending} search={search} setSearch={setSearch} openDetail={openDetail} />}
-        {view === "scatter" && <Scatter year={year} xMetric={xMetric} setXMetric={setXMetric} yMetric={yMetric} setYMetric={setYMetric} search={search} setSearch={setSearch} openDetail={openDetail} />}
+        {view === "scatter" && <Scatter year={year} xMetric={xMetric} setXMetric={setXMetric} yMetric={yMetric} setYMetric={setYMetric} pref={scatterPref} setPref={setScatterPref} prefs={prefs} search={scatterSearch} setSearch={setScatterSearch} openDetail={openDetail} />}
         {view === "detail" && <Detail year={year} selected={selected} setSelectedCode={setSelectedCode} metric={metric} setMetric={setMetric} />}
         {view === "wakayama" && <Wakayama year={year} openDetail={openDetail} />}
         {view === "guide" && <BeginnerGuide />}
@@ -260,7 +262,7 @@ function Ranking(props: {
       <div className="insight"><span className="insight-mark">!</span><p><b>読み方のヒント</b>{metrics[metric].better === "low" ? "値が高い団体ほど、継続的な確認が必要です。" : "値が低い団体ほど、相対的な余力が小さい傾向です。"}</p></div>
     </div>
     <div className="filter-panel">
-      <label className="search-field"><span>⌕</span><input value={props.search} onChange={(e) => props.setSearch(e.target.value)} placeholder="団体名・都道府県で検索" /></label>
+      <label className="search-filter"><span>団体検索</span><div className="search-field"><span>⌕</span><input value={props.search} onChange={(e) => props.setSearch(e.target.value)} placeholder="団体名・都道府県で検索" /></div></label>
       <label><span>都道府県</span><select value={props.pref} onChange={(e) => props.setPref(e.target.value)}>{props.prefs.map((v) => <option key={v}>{v}</option>)}</select></label>
       <label><span>類似団体区分</span><select value={props.group} onChange={(e) => props.setGroup(e.target.value)}>{props.groups.map((v) => <option key={v}>{v}</option>)}</select></label>
       <label><span>人口下限</span><select value={props.population} onChange={(e) => props.setPopulation(Number(e.target.value))}><option value={0}>指定なし</option><option value={10000}>1万人以上</option><option value={100000}>10万人以上</option><option value={500000}>50万人以上</option></select></label>
@@ -280,16 +282,17 @@ function Ranking(props: {
   </section>;
 }
 
-function Scatter({ year, xMetric, setXMetric, yMetric, setYMetric, search, setSearch, openDetail }: { year: number; xMetric: MetricKey; setXMetric: (v: MetricKey) => void; yMetric: MetricKey; setYMetric: (v: MetricKey) => void; search: string; setSearch: (v: string) => void; openDetail: (m: Municipality) => void }) {
-  const plotted = allMunicipalities.filter((m) => metricValue(m, xMetric, year) != null && metricValue(m, yMetric, year) != null);
+function Scatter({ year, xMetric, setXMetric, yMetric, setYMetric, pref, setPref, prefs, search, setSearch, openDetail }: { year: number; xMetric: MetricKey; setXMetric: (v: MetricKey) => void; yMetric: MetricKey; setYMetric: (v: MetricKey) => void; pref: string; setPref: (v: string) => void; prefs: string[]; search: string; setSearch: (v: string) => void; openDetail: (m: Municipality) => void }) {
+  const plotted = allMunicipalities.filter((m) => (pref === "すべて" || m.pref === pref) && metricValue(m, xMetric, year) != null && metricValue(m, yMetric, year) != null);
   const xValues = plotted.map((m) => metricValue(m, xMetric, year) as number); const yValues = plotted.map((m) => metricValue(m, yMetric, year) as number);
   const minX = Math.min(...xValues); const maxX = Math.max(...xValues); const minY = Math.min(...yValues); const maxY = Math.max(...yValues);
   const avgX = xValues.reduce((a, b) => a + b, 0) / xValues.length; const avgY = yValues.reduce((a, b) => a + b, 0) / yValues.length;
-  const match = allMunicipalities.find((m) => m.name.includes(search));
+  const normalizedSearch = search.trim();
+  const match = normalizedSearch ? plotted.find((m) => m.name.includes(normalizedSearch)) : undefined;
   return <section className="page">
     <PageIntro eyebrow="RELATIONSHIP MAP" title="指標マップ" text={`${year}年度の2つの指標を重ね、単一指標では見えない財政構造を捉えます。`} />
     <div className="scatter-layout"><div className="chart-card">
-      <div className="chart-toolbar"><label><span>X軸</span><select value={xMetric} onChange={(e) => setXMetric(e.target.value as MetricKey)}>{Object.entries(metrics).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></label><span className="cross">×</span><label><span>Y軸</span><select value={yMetric} onChange={(e) => setYMetric(e.target.value as MetricKey)}>{Object.entries(metrics).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></label><label className="search-field compact"><span>⌕</span><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="団体をハイライト" /></label></div>
+      <div className="chart-toolbar"><label><span>X軸</span><select value={xMetric} onChange={(e) => setXMetric(e.target.value as MetricKey)}>{Object.entries(metrics).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></label><span className="cross">×</span><label><span>Y軸</span><select value={yMetric} onChange={(e) => setYMetric(e.target.value as MetricKey)}>{Object.entries(metrics).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></label><label><span>都道府県</span><select value={pref} onChange={(e) => setPref(e.target.value)}>{prefs.map((value) => <option key={value}>{value}</option>)}</select></label><label className="search-filter"><span>団体検索</span><div className="search-field compact"><span>⌕</span><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="団体をハイライト" /></div></label></div>
       <div className="scatter-chart">
         <div className="danger-zone"><span>注視ゾーン</span></div><div className="axis-line x" style={{ left: `${((avgX - minX) / (maxX - minX || 1)) * 100}%` }} /><div className="axis-line y" style={{ bottom: `${((avgY - minY) / (maxY - minY || 1)) * 100}%` }} />
         {plotted.map((m) => { const x = metricValue(m, xMetric, year) as number; const y = metricValue(m, yMetric, year) as number; const left = ((x - minX) / (maxX - minX || 1)) * 92 + 4; const bottom = ((y - minY) / (maxY - minY || 1)) * 84 + 7; const highlight = match?.code === m.code; const pointSize = Math.max(9, Math.min(24, Math.sqrt(populationAt(m, year)) / 65)); return <button key={m.code} className={`point ${m.pref === "和歌山県" ? "wakayama" : ""} ${highlight ? "highlight" : ""}`} style={{ left: `${left}%`, bottom: `${bottom}%`, width: `${pointSize}px`, height: `${pointSize}px` }} onClick={() => openDetail(m)} aria-label={`${m.name} ${formatMetric(x, xMetric)} / ${formatMetric(y, yMetric)}`}><span>{m.name}</span></button>; })}
@@ -441,7 +444,7 @@ function BeginnerGuide() {
     <PageIntro eyebrow="FISCAL BASICS" title="やさしい指標解説" text="はじめて財政を見る人のために、計算方法と数字の意味を、身近な例で説明します。" />
 
     <div className="guide-hero">
-      <div><span className="guide-kicker">まず、ここだけ覚えよう</span><h2>市町村の財政は、<br />「まちの大きな家計簿」です。</h2><p>市町村は、税金や国からのお金を受け取り、学校、道路、ごみ収集、消防、福祉などに使います。ただし、普通の家計と違い、利益を出すことが目的ではありません。住民に必要なサービスを続けながら、急な災害や将来の負担にも備える必要があります。</p></div>
+      <div className="guide-lead"><span className="guide-kicker">まず、ここだけ覚えよう</span><h2>市町村の財政は、<br />「まちの大きな家計簿」です。</h2><p>市町村は、<strong>税金や国からのお金</strong>を受け取り、学校、道路、ごみ収集、消防、福祉などに使います。</p><p><em>普通の家計と違い、利益を出すことが目的ではありません。</em><br />住民に必要なサービスを続けながら、急な災害や将来の負担にも備える必要があります。</p></div>
       <div className="household-map"><div><span>まちの収入</span><b>税金・地方交付税など</b><small>家計なら「給料」に近い</small></div><i>→</i><div><span>まちの支出</span><b>教育・福祉・道路など</b><small>家計なら「生活費」に近い</small></div><i>＋</i><div><span>将来への備え</span><b>基金・借金の管理</b><small>家計なら「貯金とローン」</small></div></div>
     </div>
 

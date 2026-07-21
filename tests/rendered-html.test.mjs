@@ -39,6 +39,10 @@ test("keeps data and methodology labels explicit", async () => {
   assert.match(dashboard, /やさしい指標解説/);
   assert.match(dashboard, /まちの大きな家計簿/);
   assert.match(dashboard, /読み間違いに注意/);
+  assert.match(dashboard, /const normalizedSearch = search\.trim\(\)/);
+  assert.match(dashboard, /normalizedSearch \? plotted\.find/);
+  assert.match(dashboard, /<span>都道府県<\/span><select value=\{pref\}/);
+  assert.match(dashboard, /className="search-filter"/);
   assert.match(data, /metricHistory/);
   assert.match(data, /groupAt/);
   assert.match(officialData, /一般市Ⅰ－１/);
