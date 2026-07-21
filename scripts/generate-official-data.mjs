@@ -1,58 +1,75 @@
 import { createReadStream } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
-const inputDir = resolve(process.argv[2] ?? "");
-const outputPath = resolve(process.argv[3] ?? "app/official-data.json");
-const years = [2020, 2021, 2022, 2023, 2024];
+function parseArguments(argv) {
+  const positional = [];
+  const options = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const value = argv[index];
+    if (!value.startsWith("--")) positional.push(value);
+    else options[value.slice(2)] = argv[index + 1]?.startsWith("--") ? true : argv[++index];
+  }
+  return { positional, options };
+}
+
+const { positional, options } = parseArguments(process.argv.slice(2));
+if (!positional[0] || !options["health-data"] || !options.snapshot) {
+  throw new Error("Usage: node scripts/generate-official-data.mjs <csv-directory> [output] --health-data <json> --snapshot <YYYY-MM-DD> [--source-url <url>]");
+}
+
+const inputDir = resolve(positional[0]);
+const outputPath = resolve(positional[1] ?? "app/official-data.json");
+const healthData = JSON.parse(await readFile(resolve(options["health-data"]), "utf8"));
 const records = new Map();
 const groupAverages = {};
-
-if (!process.argv[2]) {
-  throw new Error("Usage: node scripts/generate-official-data.mjs <extracted-csv-directory> [output]");
-}
 
 function parseCsvLine(line) {
   const values = [];
   let value = "";
   let quoted = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const char = line[i];
-    if (char === '"') {
-      if (quoted && line[i + 1] === '"') {
-        value += '"';
-        i += 1;
-      } else {
-        quoted = !quoted;
-      }
-    } else if (char === "," && !quoted) {
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (character === '"') {
+      if (quoted && line[index + 1] === '"') { value += '"'; index += 1; }
+      else quoted = !quoted;
+    } else if (character === "," && !quoted) {
       values.push(value);
       value = "";
-    } else {
-      value += char;
-    }
+    } else value += character;
   }
   values.push(value);
   return values;
 }
 
-async function forEachCsv(fileName, handler) {
-  const path = join(inputDir, fileName);
-  const input = createReadStream(path, { encoding: "utf8" });
+async function readCsvRows(fileName) {
+  const rows = [];
+  const input = createReadStream(join(inputDir, fileName), { encoding: "utf8" });
   const lines = createInterface({ input, crlfDelay: Infinity });
   let headers;
   for await (const rawLine of lines) {
     const line = rawLine.replace(/^\uFEFF/, "");
-    if (!headers) {
-      headers = parseCsvLine(line);
-      continue;
-    }
+    if (!headers) { headers = parseCsvLine(line); continue; }
     if (!line) continue;
     const values = parseCsvLine(line);
-    const row = Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
-    handler(row);
+    rows.push(Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""])));
   }
+  return rows;
+}
+
+const masterRows = await readCsvRows("finance_data_table_master.csv");
+const availableYears = [...new Set(masterRows.map((row) => Number(row["年度"])).filter(Number.isFinite))].sort((a, b) => a - b);
+const years = availableYears.slice(-5);
+if (years.length !== 5 || years.some((year, index) => index > 0 && year !== years[index - 1] + 1)) {
+  throw new Error(`直近5年度を連続して取得できません: ${availableYears.join(", ")}`);
+}
+for (const year of years) {
+  if (!healthData.years?.[year]) throw new Error(`${year}年度の健全化判断比率データがありません。更新元を追加してください。`);
+}
+
+async function forEachCsv(fileName, handler) {
+  for (const row of await readCsvRows(fileName)) handler(row);
 }
 
 function emptySeries() { return years.map(() => null); }
@@ -82,14 +99,14 @@ function ensureRecord(row) {
   return records.get(code);
 }
 
-await forEachCsv("finance_data_table_master.csv", (row) => {
+for (const row of masterRows) {
   const index = yearIndex(row["年度"]);
-  if (index < 0) return;
+  if (index < 0) continue;
   const record = ensureRecord(row);
   record.g[index] = row["類似団体区分"] || null;
   record.pop[index] = numberOrNull(row["人口数_人"]);
   record.size[index] = numberOrNull(row["標準財政規模_千円"]);
-});
+}
 
 const indicatorMap = {
   "財政力指数": ["f", 1],
@@ -121,16 +138,14 @@ const fundItems = new Set(["財政調整基金", "減債基金", "その他特�
 await forEachCsv("finance_data_table_stock.csv", (row) => {
   const index = yearIndex(row["年度"]);
   if (index < 0 || row["分類"] !== "積立金" || row["大項目"] !== "積立金現在高" || !fundItems.has(row["項目"])) return;
-  const record = ensureRecord(row);
-  record._funds[index] += numberOrNull(row["値_千円"]) ?? 0;
+  ensureRecord(row)._funds[index] += numberOrNull(row["値_千円"]) ?? 0;
 });
 
 await forEachCsv("finance_local_finance_data_table_flow.csv", (row) => {
   const index = yearIndex(row["年度"]);
   if (index < 0 || row["分類"] !== "歳出 (性質)") return;
-  const record = ensureRecord(row);
   const value = numberOrNull(row["値_千円"]) ?? 0;
-  const flow = record._flow[index];
+  const flow = ensureRecord(row)._flow[index];
   flow.total += value;
   if (row["大項目"] === "人件費") flow.personnel += value;
   if (row["大項目"] === "扶助費") flow.assistance += value;
@@ -149,31 +164,25 @@ for (const record of records.values()) {
       record.comp.d[index] = Number((flow.debt / flow.total * 100).toFixed(1));
       record.comp.o[index] = Number(((flow.total - flow.personnel - flow.assistance - flow.debt) / flow.total * 100).toFixed(1));
     }
+    const health = healthData.years[years[index]].values?.[record.c] ?? {};
+    record.v.a[index] = health.a ?? 0;
+    record.v.c[index] = health.c ?? 0;
   }
   delete record._funds;
   delete record._flow;
 }
 
-// 実質赤字比率・連結実質赤字比率は、e-Stat統計ダッシュボードの
-// 2020～2022年度市区町村データと、総務省の2023・2024年度確報を照合。
-// 公表値「－」（赤字なし）は比較・描画用に0として保持し、画面では
-// 「赤字なし」と表示する。対象1,741団体で正の値があるのは次の3件。
-const actualDeficitOverrides = { "26100": { 2020: 0.07 }, "27224": { 2022: 0.14 } };
-const consolidatedDeficitOverrides = { "46303": { 2020: 17.72 } };
-for (const record of records.values()) {
-  record.v.a = years.map((year) => actualDeficitOverrides[record.c]?.[year] ?? 0);
-  record.v.c = years.map((year) => consolidatedDeficitOverrides[record.c]?.[year] ?? 0);
-}
-
 const municipalities = [...records.values()].sort((a, b) => a.c.localeCompare(b.c, "ja"));
 const output = {
-  snapshot: "2026-04-24",
+  snapshot: options.snapshot,
+  generatedAt: new Date().toISOString(),
   source: "デジタル庁・総務省『地方財政（市町村ごと）データテーブル』",
-  sourceUrl: "https://www.digital.go.jp/resources/japandashboard/municipal-finance",
-  healthRatioSnapshot: "2025-11-28",
-  healthRatioSource: "総務省『決算に基づく健全化判断比率・資金不足比率の概要（確報）』・e-Stat社会・人口統計体系",
-  healthRatioSourceUrl: "https://www.soumu.go.jp/menu_news/s-news/01zaisei07_02000434.html",
-  healthRatioApiUrl: "https://dashboard.e-stat.go.jp/api/1.0/Json/getData?Lang=JP&IndicatorCode=1302050000001120010,1302050000001220010&RegionalRank=4&Cycle=4&IsSeasonalAdjustment=1&MetaGetFlg=Y&SectionHeaderFlg=1",
+  sourceUrl: options["source-url"] ?? "https://www.digital.go.jp/resources/japandashboard/municipal-finance",
+  healthRatioSnapshot: healthData.snapshot,
+  healthRatioSource: healthData.source,
+  healthRatioSourceUrl: healthData.sourceUrl,
+  healthRatioApiUrl: healthData.apiUrl,
+  healthRatioSources: healthData.sources,
   years,
   groupAverages,
   municipalities,

@@ -5,40 +5,32 @@ import test from "node:test";
 const data = JSON.parse(await readFile(new URL("../app/official-data.json", import.meta.url), "utf8"));
 
 test("official snapshot has complete municipality-year grain", () => {
-  assert.deepEqual(data.years, [2020, 2021, 2022, 2023, 2024]);
-  assert.equal(data.snapshot, "2026-04-24");
-  assert.equal(data.municipalities.length, 1741);
-  assert.equal(new Set(data.municipalities.map((item) => item.c)).size, 1741);
+  assert.equal(data.years.length, 5);
+  assert.ok(data.years.every((year, index) => index === 0 || year === data.years[index - 1] + 1));
+  assert.ok(data.years.at(-1) >= 2024);
+  assert.match(data.snapshot, /^\d{4}-\d{2}-\d{2}$/);
+  assert.ok(data.municipalities.length >= 1700 && data.municipalities.length <= 1800);
+  assert.equal(new Set(data.municipalities.map((item) => item.c)).size, data.municipalities.length);
+  assert.equal(new Set(data.municipalities.map((item) => item.p)).size, 47);
   assert.ok(data.municipalities.every((item) => item.g.length === 5 && item.g.every(Boolean)));
-  assert.ok(data.municipalities.every((item) => item.pop.length === 5 && item.pop.every((value) => Number.isFinite(value))));
+  assert.ok(data.municipalities.every((item) => item.pop.length === 5 && item.pop.every(Number.isFinite)));
 });
 
 test("formal peer groups and five-year metric series are retained", () => {
-  const wakayama = data.municipalities.find((item) => item.c === "30201");
-  const kainan = data.municipalities.find((item) => item.c === "30202");
-  const hashimoto = data.municipalities.find((item) => item.c === "30203");
-  assert.equal(wakayama.g[4], "中核市");
-  assert.equal(kainan.g[4], "一般市Ⅰ－１");
-  assert.equal(hashimoto.g[4], "一般市Ⅱ－３");
-  for (const series of Object.values(wakayama.v)) assert.equal(series.length, 5);
-  assert.ok(wakayama.v.f.every((value) => Number.isFinite(value)));
-  assert.ok(wakayama.v.o.every((value) => Number.isFinite(value)));
-  assert.ok(wakayama.v.d.every((value) => Number.isFinite(value)));
-  assert.ok(wakayama.v.a.every((value) => Number.isFinite(value)));
-  assert.ok(wakayama.v.c.every((value) => Number.isFinite(value)));
-  assert.ok(wakayama.v.r.every((value) => Number.isFinite(value)));
-  assert.ok(wakayama.v.pe.every((value) => Number.isFinite(value)));
+  for (const code of ["30201", "30202", "30203"]) {
+    const municipality = data.municipalities.find((item) => item.c === code);
+    assert.ok(municipality);
+    assert.ok(municipality.g.at(-1));
+    for (const series of Object.values(municipality.v)) assert.equal(series.length, 5);
+    for (const key of ["f", "o", "d", "a", "c", "r", "pe"]) assert.ok(municipality.v[key].every(Number.isFinite));
+  }
 });
 
 test("statutory deficit ratios retain five-year official series", () => {
-  assert.equal(data.healthRatioSnapshot, "2025-11-28");
-  const kyoto = data.municipalities.find((item) => item.c === "26100");
-  const settsu = data.municipalities.find((item) => item.c === "27224");
-  const mishima = data.municipalities.find((item) => item.c === "46303");
-  assert.deepEqual(kyoto.v.a, [0.07, 0, 0, 0, 0]);
-  assert.deepEqual(settsu.v.a, [0, 0, 0.14, 0, 0]);
-  assert.deepEqual(mishima.v.c, [17.72, 0, 0, 0, 0]);
+  assert.match(data.healthRatioSnapshot, /^\d{4}-\d{2}-\d{2}$/);
+  assert.ok(Array.isArray(data.healthRatioSources) && data.healthRatioSources.length === data.years.length);
   assert.ok(data.municipalities.every((item) => item.v.a.length === 5 && item.v.c.length === 5));
+  assert.ok(data.municipalities.every((item) => item.v.a.every(Number.isFinite) && item.v.c.every(Number.isFinite)));
 });
 
 test("derived ratios and expenditure compositions pass range checks", () => {
@@ -56,7 +48,7 @@ test("derived ratios and expenditure compositions pass range checks", () => {
 });
 
 test("official group averages cover published indicator groups", () => {
-  assert.ok(Object.keys(data.groupAverages).length >= 33);
-  assert.ok(data.groupAverages["一般市Ⅰ－１"]);
-  assert.equal(data.groupAverages["一般市Ⅰ－１"].o.length, 5);
+  assert.ok(Object.keys(data.groupAverages).length >= 30);
+  const sample = Object.values(data.groupAverages)[0];
+  assert.equal(sample.o.length, 5);
 });

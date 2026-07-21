@@ -140,9 +140,9 @@ export default function Dashboard() {
         </nav>
         <div className="sidebar-note">
           <span className="status-dot" />
-          <div><b>公式データで表示中</b><small>デジタル庁・総務省 2020–2024年度</small></div>
+          <div><b>公式データで表示中</b><small>デジタル庁・総務省 {years[0]}–{years.at(-1)}年度</small></div>
         </div>
-        <div className="sidebar-footer">地方財政状況調査ベース<br />データ更新 2026.04.24</div>
+        <div className="sidebar-footer">地方財政状況調査ベース<br />データ取得 {dataSnapshot.replaceAll("-", ".")}</div>
       </aside>
 
       <main>
@@ -329,7 +329,7 @@ function Detail({ year, selected, setSelectedCode, metric, setMetric }: { year: 
   const personnel = composition.personnel ?? 0; const assistance = composition.assistance ?? 0; const debt = composition.debt ?? 0; const other = composition.other ?? 0;
   const donutStyle = { background: `conic-gradient(var(--ink) 0 ${personnel}%, var(--teal) ${personnel}% ${personnel + assistance}%, var(--coral) ${personnel + assistance}% ${personnel + assistance + debt}%, #d8c8a9 ${personnel + assistance + debt}% 100%)` };
   return <section className="page">
-    <PageIntro eyebrow="MUNICIPALITY PROFILE" title="団体カルテ" text={`${year}年度の公式値と、2020年度からの指標別推移を表示します。`} />
+    <PageIntro eyebrow="MUNICIPALITY PROFILE" title="団体カルテ" text={`${year}年度の公式値と、${years[0]}年度からの指標別推移を表示します。`} />
     <div className="entity-picker"><label><span>対象団体</span><select value={selected.code} onChange={(e) => setSelectedCode(e.target.value)}>{allMunicipalities.map((m) => <option key={m.code} value={m.code}>{m.pref}　{m.name}</option>)}</select></label><div><GroupTag group={selectedGroup} accent /><span>{populationAt(selected, year).toLocaleString()}人</span><span>団体コード {selected.code}</span></div></div>
     <div className="profile-hero"><div><span className="eyebrow">FISCAL SNAPSHOT</span><h2>{selected.name}</h2><p>{selected.pref}における経常収支比率順位 <b>{prefRank > 0 ? `${prefRank}位` : "—"}</b> ／ 全国順位 <b>{nationalRank > 0 ? `${nationalRank}位` : "—"}</b></p></div><div className="cause-badge"><span>歳出（性質別）の最大費目</span><strong>{causeAt(selected, year)}</strong><small>人件費・扶助費・公債費の構成比から判定</small></div></div>
     <div className="metric-grid">{cards.map((key) => { const value = metricValue(selected, key, year); const benchmark = benchmarkFor(selected, key, year); const diff = value != null && benchmark != null ? value - benchmark : null; const isBad = diff != null && (metrics[key].better === "low" ? diff > 0 : diff < 0); const context = key === "actualDeficit" ? "早期健全化基準 11.25～15%" : key === "consolidatedDeficit" ? "早期健全化基準 16.25～20%" : diff == null ? "類似団体平均 —" : `類似団体平均 ${diff > 0 ? "+" : ""}${diff.toFixed(metrics[key].digits)}${metrics[key].unit}`; return <div className="metric-card" key={key}><div><span>{metrics[key].label}</span><HelpTip label={metrics[key].label} text={metricHelp[key]} /></div><strong>{formatMetric(value, key)}</strong><p className={isDeficitMetric(key) && (value ?? 0) > 0 ? "bad-text" : diff == null ? "no-data" : isBad ? "bad-text" : "good-text"}>{context}</p><div className="range"><i style={{ width: value == null || (isDeficitMetric(key) && value === 0) ? "0" : `${Math.min(100, Math.max(8, (value / (key === "fiscalStrength" ? 1.8 : key === "futureBurden" ? 280 : isDeficitMetric(key) ? 20 : 140)) * 100))}%` }} /></div></div>; })}</div>
@@ -546,17 +546,17 @@ function FiscalRiskGuide() {
 }
 
 function Sources() {
+  const yearRange = `${years[0]}～${years.at(-1)}年度`;
   const sourceRows = [
-    ["地方財政（市町村ごと）データテーブル", "デジタル庁・総務省", "指標・歳入歳出・団体基礎情報", "2026.04.24"],
-    ["健全化判断比率・資金不足比率（確報）", "総務省", "2023・2024年度の赤字比率", "2025.11.28"],
-    ["社会・人口統計体系 市区町村データ", "e-Stat", "2020～2022年度の赤字比率", "年度別"],
+    ["地方財政（市町村ごと）データテーブル", "デジタル庁・総務省", `指標・歳入歳出・団体基礎情報（${yearRange}）`, dataSnapshot.replaceAll("-", ".")],
+    ["健全化判断比率・資金不足比率（確報）", "総務省・e-Stat", `実質赤字比率・連結実質赤字比率（${yearRange}）`, healthRatioSnapshot.replaceAll("-", ".")],
     ["類似団体別市町村財政指数表", "総務省", "正式な類似団体区分・平均値", "年度別"],
-    ["地方財政状況調査", "総務省", "2020～2024年度決算", "年度別"],
+    ["地方財政状況調査", "総務省", `${yearRange}決算`, "年度別"],
   ];
   return <section className="page sources-page">
     <PageIntro eyebrow="METHODOLOGY & SOURCES" title="出典・注意" text="数字の出どころ、加工方法、そしてこのツールで言えることの限界を明らかにします。" />
-    <div className="demo-banner verified"><span>✓</span><div><b>公式公表データへ接続済みです</b><p>デジタル庁・総務省が公開する2020～2024年度の全国1,741団体を収録しています。類似団体区分は各年度の正式区分です。</p></div></div>
-    <div className="source-grid"><div className="panel source-main"><span className="eyebrow">DATA LINEAGE</span><h2>データソース</h2><div className="source-table">{sourceRows.map((row) => <div key={row[0]}><div><b>{row[0]}</b><small>{row[1]}</small></div><span>{row[2]}</span><em>{row[3]}</em></div>)}</div><div className="source-links"><a className="source-link" href="https://www.digital.go.jp/resources/japandashboard/municipal-finance" target="_blank" rel="noreferrer">デジタル庁の公開ページ ↗</a><a className="source-link" href={healthRatioSourceUrl} target="_blank" rel="noreferrer">総務省の2024年度確報 ↗</a></div></div><div className="panel update-card"><span className="eyebrow">DATA SNAPSHOT</span><b>基礎財政データ取得日</b><h2>{dataSnapshot.replaceAll("-", ".")}</h2><p>赤字比率確報：{healthRatioSnapshot.replaceAll("-", ".")}<br />対象年度：2020～2024<br />対象：全国 {allMunicipalities.length.toLocaleString()}団体</p><div className="update-status"><i />公式スナップショット</div></div></div>
+    <div className="demo-banner verified"><span>✓</span><div><b>公式公表データへ接続済みです</b><p>デジタル庁・総務省が公開する{yearRange}の全国{allMunicipalities.length.toLocaleString()}団体を収録しています。類似団体区分は各年度の正式区分です。</p></div></div>
+    <div className="source-grid"><div className="panel source-main"><span className="eyebrow">DATA LINEAGE</span><h2>データソース</h2><div className="source-table">{sourceRows.map((row) => <div key={row[0]}><div><b>{row[0]}</b><small>{row[1]}</small></div><span>{row[2]}</span><em>{row[3]}</em></div>)}</div><div className="source-links"><a className="source-link" href="https://www.digital.go.jp/resources/japandashboard/municipal-finance" target="_blank" rel="noreferrer">デジタル庁の公開ページ ↗</a><a className="source-link" href={healthRatioSourceUrl} target="_blank" rel="noreferrer">最新年度の赤字比率公表元 ↗</a></div></div><div className="panel update-card"><span className="eyebrow">DATA SNAPSHOT</span><b>基礎財政データ取得日</b><h2>{dataSnapshot.replaceAll("-", ".")}</h2><p>赤字比率確報：{healthRatioSnapshot.replaceAll("-", ".")}<br />対象年度：{yearRange}<br />対象：全国 {allMunicipalities.length.toLocaleString()}団体</p><div className="update-status"><i />自動品質検査済み</div></div></div>
     <div className="definitions"><span className="eyebrow">DEFINITIONS</span><h2>指標の定義と見方</h2><div className="definition-grid"><article><span>01</span><h3>財政力指数</h3><p>基準財政収入額 ÷ 基準財政需要額の3か年平均。高いほど自主財源による行政需要への対応力が高い傾向です。</p></article><article><span>02</span><h3>経常収支比率</h3><p>経常経費充当一般財源 ÷ 経常一般財源。高いほど使途の自由な財源に余裕が少ないことを示します。</p></article><article><span>03</span><h3>実質公債費比率</h3><p>公債費等 ÷ 標準財政規模の3か年平均。18%で起債許可団体、25%で早期健全化基準です。</p></article><article><span>04</span><h3>将来負担比率</h3><p>将来負担額 ÷ 標準財政規模。市町村の早期健全化基準は350%です。</p></article><article><span>05</span><h3>実質赤字比率</h3><p>一般会計等の実質赤字額 ÷ 標準財政規模。赤字がない公表値「－」は「赤字なし」と表示します。</p></article><article><span>06</span><h3>連結実質赤字比率</h3><p>全会計を連結した実質赤字額 ÷ 標準財政規模。赤字がない公表値「－」は「赤字なし」と表示します。</p></article><article><span>07</span><h3>基金残高比率</h3><p>主要3基金の残高 ÷ 標準財政規模。本ツール独自の比較指標で、低いほど備えが薄い傾向です。</p></article></div></div>
     <div className="limits-grid"><article className="can"><span>言えること</span><h3>比較の起点をつくる</h3><ul><li>同じ区分・年度で見た相対的な位置</li><li>複数指標から見た財政構造の特徴</li><li>追加確認が必要な団体の一次選定</li></ul></article><article className="cannot"><span>言えないこと</span><h3>運営の巧拙は断定しない</h3><ul><li>単一指標による財政運営の良し悪し</li><li>公営企業・特別会計を含む全体像</li><li>将来の財政状況の予測・保証</li></ul></article></div>
     <div className="process"><span className="eyebrow">PROCESS</span><h2>加工フロー</h2><div><span><b>01</b>公表CSV取得</span><i>→</i><span><b>02</b>団体コード・年度結合</span><i>→</i><span><b>03</b>欠損・重複検証</span><i>→</i><span><b>04</b>年度別系列化</span><i>→</i><span><b>05</b>表示用JSON</span></div></div>
