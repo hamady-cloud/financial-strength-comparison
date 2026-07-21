@@ -20,14 +20,17 @@ test("renders the fiscal dashboard shell", async () => {
   const html = await response.text();
   assert.match(html, /Fiscal Lens/);
   assert.match(html, /全国ランキング/);
-  assert.match(html, /デモデータで表示中/);
+  assert.match(html, /公式データで表示中/);
+  assert.match(html, /全国収録[\s\S]{0,40}1,741/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/);
 });
 
 test("keeps data and methodology labels explicit", async () => {
-  const [dashboard, data, worker] = await Promise.all([
+  const [dashboard, data, officialData, generator, worker] = await Promise.all([
     readFile(new URL("../app/Dashboard.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/data.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/official-data.json", import.meta.url), "utf8"),
+    readFile(new URL("../scripts/generate-official-data.mjs", import.meta.url), "utf8"),
     readFile(new URL("../worker/index.ts", import.meta.url), "utf8"),
   ]);
   assert.match(dashboard, /出典・注意/);
@@ -36,7 +39,11 @@ test("keeps data and methodology labels explicit", async () => {
   assert.match(dashboard, /やさしい指標解説/);
   assert.match(dashboard, /まちの大きな家計簿/);
   assert.match(dashboard, /読み間違いに注意/);
-  assert.match(data, /和歌山市/);
-  assert.match(data, /北山村/);
+  assert.match(data, /metricHistory/);
+  assert.match(data, /groupAt/);
+  assert.match(officialData, /一般市Ⅰ－１/);
+  assert.match(officialData, /北山村/);
+  assert.match(generator, /finance_data_table_groups\.csv/);
+  assert.match(generator, /finance_local_finance_data_table_flow\.csv/);
   assert.match(worker, /no-store, no-cache, must-revalidate/);
 });
