@@ -216,7 +216,7 @@ th { color:#3f5863;font-size:13px;font-weight:800;padding:13px 14px; } td { font
 
 /* Contextual help popovers */
 .help-tip { display:inline-flex;align-items:center;line-height:1; }
-.help-trigger,.metric-card .help-trigger { display:grid;place-items:center;flex:0 0 auto;width:26px;height:26px;padding:0;border:1px solid #b8c7cc;border-radius:50%;background:#fff;color:#405b66;font-size:13px;font-weight:900;line-height:1;cursor:pointer;box-shadow:0 1px 2px rgba(18,54,74,.06); }
+.help-trigger,.metric-card .help-trigger { display:grid;place-items:center;flex:0 0 auto;width:26px;height:26px;padding:0;border:2px solid #75aaa6;border-radius:50%;background:#eef7f5;color:#0f6967;font-size:13px;font-weight:900;line-height:1;cursor:pointer;box-shadow:0 1px 3px rgba(18,54,74,.1); }
 .help-trigger:hover,.help-trigger[aria-expanded="true"] { border-color:var(--teal);background:var(--teal);color:#fff; }
 .help-tip.compact .help-trigger { width:24px;height:24px;font-size:12px; }
 .help-popover { position:fixed;z-index:1000;width:min(320px,calc(100vw - 24px));padding:17px 18px;background:var(--ink);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;box-shadow:0 18px 46px rgba(18,54,74,.28);line-height:1.75; }
