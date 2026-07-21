@@ -10,7 +10,10 @@ import {
   dataSnapshot,
   formatMetric,
   groupAt,
+  healthRatioSnapshot,
+  healthRatioSourceUrl,
   indexForYear,
+  isDeficitMetric,
   metricHistory,
   metricValue,
   metrics,
@@ -51,7 +54,7 @@ function Trend({ values, good = false }: { values: Array<number | null>; good?: 
 function DownloadButton({ rows, metric, year }: { rows: Municipality[]; metric: MetricKey; year: number }) {
   function download() {
     const header = ["年度", "団体コード", "団体名", "都道府県", "類似団体区分", metrics[metric].label, "人口"];
-    const lines = rows.map((m) => [year, m.code, m.name, m.pref, groupAt(m, year), metricValue(m, metric, year) ?? "", populationAt(m, year)]);
+    const lines = rows.map((m) => { const value = metricValue(m, metric, year); return [year, m.code, m.name, m.pref, groupAt(m, year), isDeficitMetric(metric) && value === 0 ? "赤字なし" : value ?? "", populationAt(m, year)]; });
     const csv = "\uFEFF" + [header, ...lines].map((r) => r.join(",")).join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
@@ -174,6 +177,8 @@ const metricHelp: Record<MetricKey, string> = {
   ordinaryBalance: "毎年自由に使える収入のうち、人件費・福祉・借金返済など、毎年続く支出に使う割合です。高いほど、新しい事業に回せるお金の余裕が小さい傾向があります。",
   debtService: "自治体の収入規模に対して、実質的な借金返済の負担がどれくらいあるかを示す割合です。低いほど、返済負担が軽い傾向があります。",
   futureBurden: "将来支払う可能性がある借金などの負担から、基金などを差し引き、自治体の収入規模と比べた指標です。低いほど、将来の負担が小さい傾向があります。",
+  actualDeficit: "一般会計などに生じた実質的な赤字を、自治体の標準的な収入規模と比べた法定指標です。赤字がない場合は『赤字なし』と表示します。値が高いほど注意が必要です。",
+  consolidatedDeficit: "一般会計だけでなく、公営事業会計などを含む全会計を合算した実質的な赤字を、標準的な収入規模と比べた法定指標です。赤字がない場合は『赤字なし』と表示します。",
   fundBalance: "主な基金（自治体の貯金）を収入規模で割った、このツール独自の比較指標です。高いほど、災害や急な支出への備えが厚い傾向があります。",
   personnel: "歳出（性質別）の合計に対して、職員給与などの人件費が占める割合を本ツールで計算したものです。単独で良し悪しを決めず、似た規模の自治体と比べて読みます。",
 };
@@ -282,7 +287,7 @@ function Ranking(props: {
           const history = metricHistory(m, metric, year); const previous = history.length > 1 ? history[history.length - 2] : null; const yoy = value != null && previous != null ? value - previous : null;
           const first = history.find((item) => item != null); const good = first != null && value != null && (metrics[metric].better === "low" ? value <= first : value >= first);
           const diffBad = diff != null && (metrics[metric].better === "low" ? diff > 0 : diff < 0); const yoyBad = yoy != null && (metrics[metric].better === "low" ? yoy > 0 : yoy < 0);
-          return <tr key={m.code}><td><span className={`rank ${i < 3 ? "top" : ""}`}>{i + 1}</span></td><td><button className="entity" onClick={() => props.openDetail(m)}><b>{m.name}</b><small>{m.pref} · {populationAt(m, year).toLocaleString()}人</small></button></td><td><GroupTag group={groupAt(m, year)} /></td><td><strong>{formatMetric(value, metric)}</strong></td><td>{diff == null ? <span className="no-data">—</span> : <span className={diffBad ? "delta bad" : "delta good"}>{diff > 0 ? "+" : ""}{diff.toFixed(metrics[metric].digits)}{metrics[metric].unit}</span>}</td><td>{yoy == null ? <span className="no-data">—</span> : <span className={yoyBad ? "delta bad" : "delta good"}>{yoy > 0 ? "▲" : "▼"} {Math.abs(yoy).toFixed(metrics[metric].digits)}</span>}</td><td><Trend values={history} good={good} /></td><td><button className="row-arrow" aria-label={`${m.name}の詳細`} onClick={() => props.openDetail(m)}>→</button></td></tr>;
+          return <tr key={m.code}><td><span className={`rank ${i < 3 ? "top" : ""}`}>{i + 1}</span></td><td><button className="entity" onClick={() => props.openDetail(m)}><b>{m.name}</b><small>{m.pref} · {populationAt(m, year).toLocaleString()}人</small></button></td><td><GroupTag group={groupAt(m, year)} /></td><td><strong>{formatMetric(value, metric)}</strong></td><td>{diff == null ? <span className="no-data">—</span> : <span className={diffBad ? "delta bad" : "delta good"}>{diff > 0 ? "+" : ""}{diff.toFixed(metrics[metric].digits)}{metrics[metric].unit}</span>}</td><td>{yoy == null ? <span className="no-data">—</span> : <span className={yoyBad ? "delta bad" : "delta good"}>{yoy === 0 ? "→" : yoy > 0 ? "▲" : "▼"} {Math.abs(yoy).toFixed(metrics[metric].digits)}</span>}</td><td><Trend values={history} good={good} /></td><td><button className="row-arrow" aria-label={`${m.name}の詳細`} onClick={() => props.openDetail(m)}>→</button></td></tr>;
         })}</tbody></table>{rows.length === 0 && <div className="empty">条件に合う団体がありません。フィルタを変更してください。</div>}</div>
     </div>
   </section>;
@@ -315,7 +320,7 @@ function Detail({ year, selected, setSelectedCode, metric, setMetric }: { year: 
   const rankedPref = rankedNational.filter((m) => m.pref === selected.pref);
   const nationalRank = rankedNational.findIndex((m) => m.code === selected.code) + 1;
   const prefRank = rankedPref.findIndex((m) => m.code === selected.code) + 1;
-  const cards: MetricKey[] = ["fiscalStrength", "ordinaryBalance", "debtService", "futureBurden", "fundBalance", "personnel"];
+  const cards: MetricKey[] = ["fiscalStrength", "ordinaryBalance", "debtService", "futureBurden", "actualDeficit", "consolidatedDeficit", "fundBalance", "personnel"];
   const history = metricHistory(selected, metric, year);
   const availableHistory = history.filter((value): value is number => value != null);
   const historyMin = availableHistory.length ? Math.min(...availableHistory) : 0;
@@ -327,15 +332,15 @@ function Detail({ year, selected, setSelectedCode, metric, setMetric }: { year: 
     <PageIntro eyebrow="MUNICIPALITY PROFILE" title="団体カルテ" text={`${year}年度の公式値と、2020年度からの指標別推移を表示します。`} />
     <div className="entity-picker"><label><span>対象団体</span><select value={selected.code} onChange={(e) => setSelectedCode(e.target.value)}>{allMunicipalities.map((m) => <option key={m.code} value={m.code}>{m.pref}　{m.name}</option>)}</select></label><div><GroupTag group={selectedGroup} accent /><span>{populationAt(selected, year).toLocaleString()}人</span><span>団体コード {selected.code}</span></div></div>
     <div className="profile-hero"><div><span className="eyebrow">FISCAL SNAPSHOT</span><h2>{selected.name}</h2><p>{selected.pref}における経常収支比率順位 <b>{prefRank > 0 ? `${prefRank}位` : "—"}</b> ／ 全国順位 <b>{nationalRank > 0 ? `${nationalRank}位` : "—"}</b></p></div><div className="cause-badge"><span>歳出（性質別）の最大費目</span><strong>{causeAt(selected, year)}</strong><small>人件費・扶助費・公債費の構成比から判定</small></div></div>
-    <div className="metric-grid">{cards.map((key) => { const value = metricValue(selected, key, year); const benchmark = benchmarkFor(selected, key, year); const diff = value != null && benchmark != null ? value - benchmark : null; const isBad = diff != null && (metrics[key].better === "low" ? diff > 0 : diff < 0); return <div className="metric-card" key={key}><div><span>{metrics[key].label}</span><HelpTip label={metrics[key].label} text={metricHelp[key]} /></div><strong>{formatMetric(value, key)}</strong><p className={diff == null ? "no-data" : isBad ? "bad-text" : "good-text"}>{diff == null ? "類似団体平均 —" : `類似団体平均 ${diff > 0 ? "+" : ""}${diff.toFixed(metrics[key].digits)}${metrics[key].unit}`}</p><div className="range"><i style={{ width: value == null ? "0" : `${Math.min(100, Math.max(8, (value / (key === "fiscalStrength" ? 1.8 : key === "futureBurden" ? 280 : 140)) * 100))}%` }} /></div></div>; })}</div>
+    <div className="metric-grid">{cards.map((key) => { const value = metricValue(selected, key, year); const benchmark = benchmarkFor(selected, key, year); const diff = value != null && benchmark != null ? value - benchmark : null; const isBad = diff != null && (metrics[key].better === "low" ? diff > 0 : diff < 0); const context = key === "actualDeficit" ? "早期健全化基準 11.25～15%" : key === "consolidatedDeficit" ? "早期健全化基準 16.25～20%" : diff == null ? "類似団体平均 —" : `類似団体平均 ${diff > 0 ? "+" : ""}${diff.toFixed(metrics[key].digits)}${metrics[key].unit}`; return <div className="metric-card" key={key}><div><span>{metrics[key].label}</span><HelpTip label={metrics[key].label} text={metricHelp[key]} /></div><strong>{formatMetric(value, key)}</strong><p className={isDeficitMetric(key) && (value ?? 0) > 0 ? "bad-text" : diff == null ? "no-data" : isBad ? "bad-text" : "good-text"}>{context}</p><div className="range"><i style={{ width: value == null || (isDeficitMetric(key) && value === 0) ? "0" : `${Math.min(100, Math.max(8, (value / (key === "fiscalStrength" ? 1.8 : key === "futureBurden" ? 280 : isDeficitMetric(key) ? 20 : 140)) * 100))}%` }} /></div></div>; })}</div>
     <div className="detail-grid"><div className="panel"><div className="panel-title"><div><span className="eyebrow">METRIC-SPECIFIC TREND</span><h3>{metrics[metric].label}の推移</h3></div><select value={metric} onChange={(e) => setMetric(e.target.value as MetricKey)}>{Object.entries(metrics).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></div><div className="line-chart"><div className="grid-lines" /><div className="trend-columns">{history.map((value, index) => { const height = value == null ? 3 : 18 + ((value - historyMin) / (historyMax - historyMin || 1)) * 62; return <div key={years[index]}><span className={value == null ? "missing-value" : ""} style={{ bottom: `${height}%` }}>{value == null ? "—" : formatMetric(value, metric)}</span><i className={value == null ? "missing" : ""} style={{ height: `${height}%` }} /><small>{years[index]}</small></div>; })}</div></div></div>
       <div className="panel"><div className="panel-title"><div><span className="eyebrow">EXPENDITURE MIX</span><h3>歳出（性質別）の構成</h3></div></div><div className="composition"><div className="donut" style={donutStyle}><b>{year}</b><span>年度</span></div><div className="composition-list"><p><span><i style={{ background: "#12364a" }} />人件費</span><b>{composition.personnel == null ? "—" : `${personnel.toFixed(1)}%`}</b></p><p><span><i style={{ background: "#1b8a88" }} />扶助費</span><b>{composition.assistance == null ? "—" : `${assistance.toFixed(1)}%`}</b></p><p><span><i style={{ background: "#e1765d" }} />公債費</span><b>{composition.debt == null ? "—" : `${debt.toFixed(1)}%`}</b></p><p><span><i style={{ background: "#d8c8a9" }} />その他</span><b>{composition.other == null ? "—" : `${other.toFixed(1)}%`}</b></p></div></div><div className="cause-note"><b>{causeAt(selected, year)}</b><span>デジタル庁・総務省の歳出（性質別）を構成比に換算しています。</span></div></div></div>
-    <div className="table-card compact-table"><div className="table-head"><div><b>類似団体との比較</b><span className="group-summary"><GroupTag group={selectedGroup} />{peerRows.length}団体</span></div></div><div className="table-scroll"><table><thead><tr><th>団体</th><th>財政力指数</th><th>経常収支比率</th><th>実質公債費比率</th><th>基金残高比率</th></tr></thead><tbody>{peerRows.slice(0, 8).map((m) => <tr key={m.code} className={m.code === selected.code ? "selected-row" : ""}><td><b>{m.name}</b></td><td>{formatMetric(metricValue(m, "fiscalStrength", year), "fiscalStrength")}</td><td>{formatMetric(metricValue(m, "ordinaryBalance", year), "ordinaryBalance")}</td><td>{formatMetric(metricValue(m, "debtService", year), "debtService")}</td><td>{formatMetric(metricValue(m, "fundBalance", year), "fundBalance")}</td></tr>)}</tbody></table></div></div>
+    <div className="table-card compact-table"><div className="table-head"><div><b>類似団体との比較</b><span className="group-summary"><GroupTag group={selectedGroup} />{peerRows.length}団体</span></div></div><div className="table-scroll"><table><thead><tr><th>団体</th><th>財政力指数</th><th>経常収支比率</th><th>実質公債費比率</th><th>実質赤字比率</th><th>連結実質赤字比率</th><th>基金残高比率</th></tr></thead><tbody>{peerRows.slice(0, 8).map((m) => <tr key={m.code} className={m.code === selected.code ? "selected-row" : ""}><td><b>{m.name}</b></td><td>{formatMetric(metricValue(m, "fiscalStrength", year), "fiscalStrength")}</td><td>{formatMetric(metricValue(m, "ordinaryBalance", year), "ordinaryBalance")}</td><td>{formatMetric(metricValue(m, "debtService", year), "debtService")}</td><td>{formatMetric(metricValue(m, "actualDeficit", year), "actualDeficit")}</td><td>{formatMetric(metricValue(m, "consolidatedDeficit", year), "consolidatedDeficit")}</td><td>{formatMetric(metricValue(m, "fundBalance", year), "fundBalance")}</td></tr>)}</tbody></table></div></div>
   </section>;
 }
 
 function PrefectureView({ year, pref, setPref, prefs, openDetail }: { year: number; pref: string; setPref: (v: string) => void; prefs: string[]; openDetail: (m: Municipality) => void }) {
-  const keys: MetricKey[] = ["fiscalStrength", "ordinaryBalance", "debtService", "futureBurden", "fundBalance"];
+  const keys: MetricKey[] = ["fiscalStrength", "ordinaryBalance", "debtService", "futureBurden", "actualDeficit", "consolidatedDeficit", "fundBalance"];
   const rows = allMunicipalities.filter((item) => item.pref === pref);
   const currentIndex = indexForYear(year);
   const changeFromIndex = Math.max(0, currentIndex - 2);
@@ -410,6 +415,34 @@ function BeginnerGuide() {
     },
     {
       number: "05",
+      name: "実質赤字比率",
+      question: "一般会計などの赤字は、まちの標準的な収入に比べてどれくらい？",
+      simple: "学校、福祉、道路などの中心的な行政サービスを扱う会計で、年度末に実質的な赤字が出たとき、その大きさを自治体の収入規模と比べる法律上の指標です。",
+      formulaTop: "一般会計等の実質赤字額",
+      formulaBottom: "標準財政規模",
+      suffix: "× 100",
+      terms: "実質赤字額は、単なる支出超過ではなく、翌年度へ回すべきお金などを調整した後の赤字です。標準財政規模は自治体の標準的な収入の大きさです。",
+      example: "実質赤字が10億円、標準財政規模が100億円なら、10 ÷ 100 × 100 ＝ 10%。赤字がなければ、このアプリでは「赤字なし」と表示します。",
+      high: "高いほど、中心的な行政サービスを行う会計の赤字が、自治体の収入規模に比べて大きい状態です。",
+      low: "0%相当または「赤字なし」なら、実質赤字が生じていないことを示します。",
+      caution: "市町村の早期健全化基準は財政規模により11.25～15%、財政再生基準は20%です。基準以上になると法律に沿った健全化・再生計画が必要です。",
+    },
+    {
+      number: "06",
+      name: "連結実質赤字比率",
+      question: "一般会計だけでなく、まちの全会計を合わせると赤字はどれくらい？",
+      simple: "一般会計に加え、国民健康保険や公営企業なども含め、自治体全体として実質的な赤字があるかを見る法律上の指標です。家計でいえば、財布を一つだけでなく全部まとめて確認するイメージです。",
+      formulaTop: "全会計を連結した実質赤字額",
+      formulaBottom: "標準財政規模",
+      suffix: "× 100",
+      terms: "連結とは、自治体が持つ複数の会計の黒字と赤字を、法律のルールに沿って合算することです。",
+      example: "全会計を合わせた実質赤字が15億円、標準財政規模が100億円なら、15 ÷ 100 × 100 ＝ 15%。赤字がなければ「赤字なし」です。",
+      high: "高いほど、一部の会計だけでなく自治体全体で見た赤字負担が大きい状態です。",
+      low: "0%相当または「赤字なし」なら、全会計を合わせた実質赤字が生じていないことを示します。",
+      caution: "市町村の早期健全化基準は財政規模により16.25～20%、財政再生基準は30%です。個々の公営企業の資金不足は、別の『資金不足比率』でも確認します。",
+    },
+    {
+      number: "07",
       name: "基金残高比率",
       question: "もしもの時に使える貯金は、まちの収入規模に対してどれくらい？",
       simple: "自治体の主な貯金である基金を、自治体の大きさに合わせて比べるための数字です。金額だけでは大都市が大きく見えるため、収入規模で割ります。",
@@ -423,7 +456,7 @@ function BeginnerGuide() {
       caution: "これは本ツールの比較用指標で、法律上の健全化指標ではありません。基金には使い道が決まったものもあるため、全額を自由に使えるわけではありません。",
     },
     {
-      number: "06",
+      number: "08",
       name: "歳出（性質別）の構成比",
       question: "支出全体の中で、人件費・福祉・借金返済はどれくらい？",
       simple: "歳出を性質別に分け、人件費、扶助費、公債費などが支出全体に占める割合を見ます。どの種類の支出が大きいかを把握する数字です。",
@@ -459,7 +492,7 @@ function BeginnerGuide() {
 
     <div className="reading-guide"><span className="eyebrow">HOW TO READ</span><h2>数字を見る4つの順番</h2><div><article><b>1</b><h3>同じ条件で比べる</h3><p>まず類似団体平均との差を見ます。人口の違う大都市と小さな町を、そのまま比べないためです。</p></article><article><b>2</b><h3>数年の流れを見る</h3><p>1年だけの上昇・低下に慌てず、3年・5年と続く変化かを確認します。</p></article><article><b>3</b><h3>複数の数字を組み合わせる</h3><p>借金が多くても基金が厚い場合があります。負担・余力・貯金をセットで見ます。</p></article><article><b>4</b><h3>理由を調べる</h3><p>高齢化、災害復旧、施設整備など、数字が動いた背景を決算資料で確認します。</p></article></div></div>
 
-    <div className="guide-section-head"><span className="eyebrow">SIX KEY METRICS</span><h2>6つの数字を、ひとつずつ理解する</h2><p>計算式は理解しやすい形に簡略化しています。実際の公式計算では、法令に基づく控除や調整が加わる場合があります。</p></div>
+    <div className="guide-section-head"><span className="eyebrow">EIGHT KEY METRICS</span><h2>8つの数字を、ひとつずつ理解する</h2><p>計算式は理解しやすい形に簡略化しています。実際の公式計算では、法令に基づく控除や調整が加わる場合があります。</p></div>
 
     <div className="guide-metrics">{guideMetrics.map((item) => <article className="guide-metric-card" key={item.number}>
       <header><span>{item.number}</span><div><small>この数字でわかること</small><h3>{item.name}</h3></div></header>
@@ -506,7 +539,7 @@ function FiscalRiskGuide() {
 
     <div className="life-impact"><div><span className="eyebrow">FOR DAILY LIFE</span><h2>住民の暮らしには、どう関係する？</h2><p>法律が「このサービスを必ず削る」と一律に決めるわけではありません。ただし、限られたお金で赤字や借金を減らす必要があるため、計画を作る中で次の見直しが検討されることがあります。</p></div><div className="life-impact-grid"><article><b>事業の優先順位</b><p>新しい施設や工事を延期し、本当に急ぐものから行う。</p></article><article><b>サービスと料金</b><p>事業の内容、利用料や手数料を見直す。ただし自動的に値上げされるわけではありません。</p></article><article><b>役所の運営費</b><p>組織、職員配置、委託費などを見直し、支出を抑える。</p></article></div></div>
 
-    <div className="risk-clarifications"><article><h3>経常収支比率が100%を超えたらレッド？</h3><p><b>いいえ。</b> 経常収支比率は重要な注意信号ですが、財政健全化法のイエロー・レッドを直接決める4指標ではありません。</p></article><article><h3>このアプリだけで判定できる？</h3><p><b>できません。</b> このアプリには実質公債費比率と将来負担比率がありますが、実質赤字比率・連結実質赤字比率なども含めて、公表元の資料で確認する必要があります。</p></article></div>
+    <div className="risk-clarifications"><article><h3>経常収支比率が100%を超えたらレッド？</h3><p><b>いいえ。</b> 経常収支比率は重要な注意信号ですが、財政健全化法のイエロー・レッドを直接決める4指標ではありません。</p></article><article><h3>このアプリだけで判定できる？</h3><p><b>できません。</b> 4つの健全化判断比率を表示していますが、法律上の正式な判定は、監査を経て各自治体が公表する資料で必ず確認してください。</p></article></div>
 
     <div className="legal-sources"><div><span className="eyebrow">OFFICIAL SOURCES</span><h2>法律・基準の確認先</h2><p>基準は2026年7月21日時点の現行制度を確認しています。実際の判定は、各自治体が監査を経て公表する健全化判断比率をご確認ください。</p></div><div><a href="https://laws.e-gov.go.jp/law/419AC0000000094" target="_blank" rel="noreferrer">e-Gov「地方公共団体の財政の健全化に関する法律」↗</a><a href="https://laws.e-gov.go.jp/law/419CO0000000397" target="_blank" rel="noreferrer">e-Gov「同法施行令」↗</a></div></div>
   </section>;
@@ -515,14 +548,16 @@ function FiscalRiskGuide() {
 function Sources() {
   const sourceRows = [
     ["地方財政（市町村ごと）データテーブル", "デジタル庁・総務省", "指標・歳入歳出・団体基礎情報", "2026.04.24"],
+    ["健全化判断比率・資金不足比率（確報）", "総務省", "2023・2024年度の赤字比率", "2025.11.28"],
+    ["社会・人口統計体系 市区町村データ", "e-Stat", "2020～2022年度の赤字比率", "年度別"],
     ["類似団体別市町村財政指数表", "総務省", "正式な類似団体区分・平均値", "年度別"],
     ["地方財政状況調査", "総務省", "2020～2024年度決算", "年度別"],
   ];
   return <section className="page sources-page">
     <PageIntro eyebrow="METHODOLOGY & SOURCES" title="出典・注意" text="数字の出どころ、加工方法、そしてこのツールで言えることの限界を明らかにします。" />
     <div className="demo-banner verified"><span>✓</span><div><b>公式公表データへ接続済みです</b><p>デジタル庁・総務省が公開する2020～2024年度の全国1,741団体を収録しています。類似団体区分は各年度の正式区分です。</p></div></div>
-    <div className="source-grid"><div className="panel source-main"><span className="eyebrow">DATA LINEAGE</span><h2>データソース</h2><div className="source-table">{sourceRows.map((row) => <div key={row[0]}><div><b>{row[0]}</b><small>{row[1]}</small></div><span>{row[2]}</span><em>{row[3]}</em></div>)}</div><a className="source-link" href="https://www.digital.go.jp/resources/japandashboard/municipal-finance" target="_blank" rel="noreferrer">デジタル庁の公開ページを確認 ↗</a></div><div className="panel update-card"><span className="eyebrow">DATA SNAPSHOT</span><b>公開データ取得日</b><h2>{dataSnapshot.replaceAll("-", ".")}</h2><p>対象年度：2020～2024<br />対象：全国 {allMunicipalities.length.toLocaleString()}団体</p><div className="update-status"><i />公式スナップショット</div></div></div>
-    <div className="definitions"><span className="eyebrow">DEFINITIONS</span><h2>指標の定義と見方</h2><div className="definition-grid"><article><span>01</span><h3>財政力指数</h3><p>基準財政収入額 ÷ 基準財政需要額の3か年平均。高いほど自主財源による行政需要への対応力が高い傾向です。</p></article><article><span>02</span><h3>経常収支比率</h3><p>経常経費充当一般財源 ÷ 経常一般財源。高いほど使途の自由な財源に余裕が少ないことを示します。</p></article><article><span>03</span><h3>実質公債費比率</h3><p>公債費等 ÷ 標準財政規模の3か年平均。18%で起債許可団体、25%で早期健全化基準です。</p></article><article><span>04</span><h3>将来負担比率</h3><p>将来負担額 ÷ 標準財政規模。市町村の早期健全化基準は350%です。</p></article><article><span>05</span><h3>基金残高比率</h3><p>主要3基金の残高 ÷ 標準財政規模。本ツール独自の比較指標で、低いほど備えが薄い傾向です。</p></article></div></div>
+    <div className="source-grid"><div className="panel source-main"><span className="eyebrow">DATA LINEAGE</span><h2>データソース</h2><div className="source-table">{sourceRows.map((row) => <div key={row[0]}><div><b>{row[0]}</b><small>{row[1]}</small></div><span>{row[2]}</span><em>{row[3]}</em></div>)}</div><div className="source-links"><a className="source-link" href="https://www.digital.go.jp/resources/japandashboard/municipal-finance" target="_blank" rel="noreferrer">デジタル庁の公開ページ ↗</a><a className="source-link" href={healthRatioSourceUrl} target="_blank" rel="noreferrer">総務省の2024年度確報 ↗</a></div></div><div className="panel update-card"><span className="eyebrow">DATA SNAPSHOT</span><b>基礎財政データ取得日</b><h2>{dataSnapshot.replaceAll("-", ".")}</h2><p>赤字比率確報：{healthRatioSnapshot.replaceAll("-", ".")}<br />対象年度：2020～2024<br />対象：全国 {allMunicipalities.length.toLocaleString()}団体</p><div className="update-status"><i />公式スナップショット</div></div></div>
+    <div className="definitions"><span className="eyebrow">DEFINITIONS</span><h2>指標の定義と見方</h2><div className="definition-grid"><article><span>01</span><h3>財政力指数</h3><p>基準財政収入額 ÷ 基準財政需要額の3か年平均。高いほど自主財源による行政需要への対応力が高い傾向です。</p></article><article><span>02</span><h3>経常収支比率</h3><p>経常経費充当一般財源 ÷ 経常一般財源。高いほど使途の自由な財源に余裕が少ないことを示します。</p></article><article><span>03</span><h3>実質公債費比率</h3><p>公債費等 ÷ 標準財政規模の3か年平均。18%で起債許可団体、25%で早期健全化基準です。</p></article><article><span>04</span><h3>将来負担比率</h3><p>将来負担額 ÷ 標準財政規模。市町村の早期健全化基準は350%です。</p></article><article><span>05</span><h3>実質赤字比率</h3><p>一般会計等の実質赤字額 ÷ 標準財政規模。赤字がない公表値「－」は「赤字なし」と表示します。</p></article><article><span>06</span><h3>連結実質赤字比率</h3><p>全会計を連結した実質赤字額 ÷ 標準財政規模。赤字がない公表値「－」は「赤字なし」と表示します。</p></article><article><span>07</span><h3>基金残高比率</h3><p>主要3基金の残高 ÷ 標準財政規模。本ツール独自の比較指標で、低いほど備えが薄い傾向です。</p></article></div></div>
     <div className="limits-grid"><article className="can"><span>言えること</span><h3>比較の起点をつくる</h3><ul><li>同じ区分・年度で見た相対的な位置</li><li>複数指標から見た財政構造の特徴</li><li>追加確認が必要な団体の一次選定</li></ul></article><article className="cannot"><span>言えないこと</span><h3>運営の巧拙は断定しない</h3><ul><li>単一指標による財政運営の良し悪し</li><li>公営企業・特別会計を含む全体像</li><li>将来の財政状況の予測・保証</li></ul></article></div>
     <div className="process"><span className="eyebrow">PROCESS</span><h2>加工フロー</h2><div><span><b>01</b>公表CSV取得</span><i>→</i><span><b>02</b>団体コード・年度結合</span><i>→</i><span><b>03</b>欠損・重複検証</span><i>→</i><span><b>04</b>年度別系列化</span><i>→</i><span><b>05</b>表示用JSON</span></div></div>
   </section>;

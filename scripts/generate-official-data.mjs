@@ -73,7 +73,7 @@ function ensureRecord(row) {
       g: emptySeries(),
       pop: emptySeries(),
       size: emptySeries(),
-      v: { f: emptySeries(), o: emptySeries(), d: emptySeries(), b: emptySeries(), r: emptySeries(), pe: emptySeries() },
+      v: { f: emptySeries(), o: emptySeries(), d: emptySeries(), b: emptySeries(), a: emptySeries(), c: emptySeries(), r: emptySeries(), pe: emptySeries() },
       comp: { pe: emptySeries(), a: emptySeries(), d: emptySeries(), o: emptySeries() },
       _funds: years.map(() => 0),
       _flow: years.map(() => ({ total: 0, personnel: 0, assistance: 0, debt: 0 })),
@@ -154,11 +154,26 @@ for (const record of records.values()) {
   delete record._flow;
 }
 
+// 実質赤字比率・連結実質赤字比率は、e-Stat統計ダッシュボードの
+// 2020～2022年度市区町村データと、総務省の2023・2024年度確報を照合。
+// 公表値「－」（赤字なし）は比較・描画用に0として保持し、画面では
+// 「赤字なし」と表示する。対象1,741団体で正の値があるのは次の3件。
+const actualDeficitOverrides = { "26100": { 2020: 0.07 }, "27224": { 2022: 0.14 } };
+const consolidatedDeficitOverrides = { "46303": { 2020: 17.72 } };
+for (const record of records.values()) {
+  record.v.a = years.map((year) => actualDeficitOverrides[record.c]?.[year] ?? 0);
+  record.v.c = years.map((year) => consolidatedDeficitOverrides[record.c]?.[year] ?? 0);
+}
+
 const municipalities = [...records.values()].sort((a, b) => a.c.localeCompare(b.c, "ja"));
 const output = {
   snapshot: "2026-04-24",
   source: "デジタル庁・総務省『地方財政（市町村ごと）データテーブル』",
   sourceUrl: "https://www.digital.go.jp/resources/japandashboard/municipal-finance",
+  healthRatioSnapshot: "2025-11-28",
+  healthRatioSource: "総務省『決算に基づく健全化判断比率・資金不足比率の概要（確報）』・e-Stat社会・人口統計体系",
+  healthRatioSourceUrl: "https://www.soumu.go.jp/menu_news/s-news/01zaisei07_02000434.html",
+  healthRatioApiUrl: "https://dashboard.e-stat.go.jp/api/1.0/Json/getData?Lang=JP&IndicatorCode=1302050000001120010,1302050000001220010&RegionalRank=4&Cycle=4&IsSeasonalAdjustment=1&MetaGetFlg=Y&SectionHeaderFlg=1",
   years,
   groupAverages,
   municipalities,

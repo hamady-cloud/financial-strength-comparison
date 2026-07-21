@@ -49,10 +49,14 @@ test("keeps data and methodology labels explicit", async () => {
   assert.match(dashboard, /財政悪化でどうなる？/);
   assert.match(dashboard, /function FiscalRiskGuide/);
   assert.match(dashboard, /実質赤字比率/);
+  assert.match(dashboard, /連結実質赤字比率/);
+  assert.match(dashboard, /赤字なし/);
   assert.match(dashboard, /財政再生団体になると/);
   assert.match(dashboard, /laws\.e-gov\.go\.jp\/law\/419AC0000000094/);
   assert.match(data, /metricHistory/);
   assert.match(data, /groupAt/);
+  assert.match(data, /actualDeficit/);
+  assert.match(data, /consolidatedDeficit/);
   assert.match(officialData, /一般市Ⅰ－１/);
   assert.match(officialData, /北山村/);
   const parsedOfficialData = JSON.parse(officialData);

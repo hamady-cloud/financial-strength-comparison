@@ -24,8 +24,21 @@ test("formal peer groups and five-year metric series are retained", () => {
   assert.ok(wakayama.v.f.every((value) => Number.isFinite(value)));
   assert.ok(wakayama.v.o.every((value) => Number.isFinite(value)));
   assert.ok(wakayama.v.d.every((value) => Number.isFinite(value)));
+  assert.ok(wakayama.v.a.every((value) => Number.isFinite(value)));
+  assert.ok(wakayama.v.c.every((value) => Number.isFinite(value)));
   assert.ok(wakayama.v.r.every((value) => Number.isFinite(value)));
   assert.ok(wakayama.v.pe.every((value) => Number.isFinite(value)));
+});
+
+test("statutory deficit ratios retain five-year official series", () => {
+  assert.equal(data.healthRatioSnapshot, "2025-11-28");
+  const kyoto = data.municipalities.find((item) => item.c === "26100");
+  const settsu = data.municipalities.find((item) => item.c === "27224");
+  const mishima = data.municipalities.find((item) => item.c === "46303");
+  assert.deepEqual(kyoto.v.a, [0.07, 0, 0, 0, 0]);
+  assert.deepEqual(settsu.v.a, [0, 0, 0.14, 0, 0]);
+  assert.deepEqual(mishima.v.c, [17.72, 0, 0, 0, 0]);
+  assert.ok(data.municipalities.every((item) => item.v.a.length === 5 && item.v.c.length === 5));
 });
 
 test("derived ratios and expenditure compositions pass range checks", () => {

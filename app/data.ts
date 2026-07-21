@@ -5,6 +5,8 @@ export type MetricKey =
   | "ordinaryBalance"
   | "debtService"
   | "futureBurden"
+  | "actualDeficit"
+  | "consolidatedDeficit"
   | "fundBalance"
   | "personnel";
 
@@ -31,7 +33,7 @@ type CompactMunicipality = {
   p: string;
   g: Array<string | null>;
   pop: Array<number | null>;
-  v: Record<"f" | "o" | "d" | "b" | "r" | "pe", Array<number | null>>;
+  v: Record<"f" | "o" | "d" | "b" | "a" | "c" | "r" | "pe", Array<number | null>>;
   comp: Record<"pe" | "a" | "d" | "o", Array<number | null>>;
 };
 
@@ -41,12 +43,17 @@ export const years = officialData.years;
 export const dataSnapshot = officialData.snapshot;
 export const dataSource = officialData.source;
 export const dataSourceUrl = officialData.sourceUrl;
+export const healthRatioSnapshot = officialData.healthRatioSnapshot;
+export const healthRatioSource = officialData.healthRatioSource;
+export const healthRatioSourceUrl = officialData.healthRatioSourceUrl;
 
 export const metrics: Record<MetricKey, { label: string; unit: string; better: "high" | "low"; digits: number; official: boolean }> = {
   fiscalStrength: { label: "財政力指数", unit: "", better: "high", digits: 2, official: true },
   ordinaryBalance: { label: "経常収支比率", unit: "%", better: "low", digits: 1, official: true },
   debtService: { label: "実質公債費比率", unit: "%", better: "low", digits: 1, official: true },
   futureBurden: { label: "将来負担比率", unit: "%", better: "low", digits: 1, official: true },
+  actualDeficit: { label: "実質赤字比率", unit: "%", better: "low", digits: 2, official: true },
+  consolidatedDeficit: { label: "連結実質赤字比率", unit: "%", better: "low", digits: 2, official: true },
   fundBalance: { label: "基金残高比率", unit: "%", better: "high", digits: 1, official: false },
   personnel: { label: "人件費比率（歳出）", unit: "%", better: "low", digits: 1, official: false },
 };
@@ -62,6 +69,8 @@ export const allMunicipalities: Municipality[] = compactRecords.map((record) => 
     ordinaryBalance: record.v.o,
     debtService: record.v.d,
     futureBurden: record.v.b,
+    actualDeficit: record.v.a,
+    consolidatedDeficit: record.v.c,
     fundBalance: record.v.r,
     personnel: record.v.pe,
   },
@@ -98,8 +107,13 @@ export function metricHistory(item: Municipality, metric: MetricKey, throughYear
 
 export function formatMetric(value: number | null, key: MetricKey) {
   if (value == null || !Number.isFinite(value)) return "—";
+  if (isDeficitMetric(key) && value === 0) return "赤字なし";
   const meta = metrics[key];
   return `${value.toFixed(meta.digits)}${meta.unit}`;
+}
+
+export function isDeficitMetric(key: MetricKey) {
+  return key === "actualDeficit" || key === "consolidatedDeficit";
 }
 
 const compactGroupAverages = officialData.groupAverages as Record<string, Partial<Record<"f" | "o" | "d" | "b", Array<number | null>>>>;
