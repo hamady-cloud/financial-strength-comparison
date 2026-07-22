@@ -51,7 +51,14 @@ test("keeps data and methodology labels explicit", async () => {
   assert.match(dashboard, /実質赤字比率/);
   assert.match(dashboard, /連結実質赤字比率/);
   assert.match(dashboard, /赤字なし/);
-  assert.match(dashboard, /財政再生団体になると/);
+  assert.match(dashboard, /自治体が自ら立て直す段階/);
+  assert.match(dashboard, /自治体だけでは立て直しが難しい段階/);
+  assert.match(dashboard, /fiscal-risk-guide\.png/);
+  assert.match(dashboard, /夕張市で、実際に起きたこと/);
+  assert.match(dashboard, /大阪府 泉佐野市/);
+  assert.match(dashboard, /長野県 王滝村/);
+  assert.doesNotMatch(dashboard, /中学生にもわかる/);
+  assert.doesNotMatch(dashboard, /かんたんな意味/);
   assert.match(dashboard, /laws\.e-gov\.go\.jp\/law\/419AC0000000094/);
   assert.match(data, /metricHistory/);
   assert.match(data, /groupAt/);

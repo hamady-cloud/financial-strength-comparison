@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- User-supplied explanatory image is intentionally served at its original resolution. */
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -518,30 +519,68 @@ function FiscalRiskGuide() {
     { name: "実質公債費比率", meaning: "毎年の収入のうち、借金返済などに使う割合（3年間の平均）", yellow: <><b>25%</b></>, red: <><b>35%</b></> },
     { name: "将来負担比率", meaning: "借金や将来支払う約束が、まちの収入規模の何年分に近いかを見る目安", yellow: <>市町村 <b>350%</b><br />都道府県・政令市 400%</>, red: <>設定なし</> },
   ];
+  const comparisonRows = [
+    ["基本的な位置付け", "自治体が自ら、計画的に改善する段階", "国の強い関与のもとで再生する段階"],
+    ["作る計画", "財政健全化計画", "財政再生計画"],
+    ["計画の決定", "自治体が作成し、議会が議決", "自治体が作成・議決し、総務大臣との協議・同意が重要"],
+    ["予算", "計画を踏まえて自治体が編成", "財政再生計画に沿って編成する義務"],
+    ["地方債（借金）", "財政再生団体のような包括的制限はない", "同意のない計画では原則として発行できず、同意後も許可が必要"],
+    ["国・都道府県の関与", "実施が難しい場合などに勧告", "計画や予算の変更まで勧告できる"],
+  ];
+  const impactAreas = [
+    { number: "01", title: "税金・料金の負担", summary: "収入を増やすため、税率・使用料・手数料や徴収方法が見直されることがあります。", items: ["市町村民税・固定資産税などの税率", "ごみ、水道・下水道の料金", "住民票・印鑑証明などの手数料", "市営住宅、保育所、公共施設、健診の利用料", "滞納税や使用料の徴収強化"], note: "指定された瞬間に自動で増税されるわけではありません。税率や料金の変更には、原則として条例改正と議会の議決が必要です。" },
+    { number: "02", title: "独自の福祉・子育て施策", summary: "法律で義務付けられたサービスより、自治体独自の「上乗せ」が先に見直されやすくなります。", items: ["子ども医療費助成の年齢・所得要件", "高齢者の交通助成や敬老祝い金", "出産・子育て、障害者への独自給付", "学校給食・教材費への独自補助", "住宅改修・耐震化などの補助"], note: "生活保護、介護保険、障害福祉、義務教育などが一斉に廃止される制度ではありません。" },
+    { number: "03", title: "公共施設の統合・縮小", summary: "維持費の大きい施設は、統合、閉鎖、民間委託、開館時間短縮の対象になり得ます。", items: ["小中学校、保育所、幼稚園", "図書館、公民館、体育館、プール", "市民会館、観光・文化施設", "病院・診療所、支所・出張所", "公営住宅"], note: "施設が遠くなる、予約しにくくなるなど、高齢者、子育て世帯、車を持たない人ほど影響を受けやすくなります。" },
+    { number: "04", title: "道路・建物・インフラ", summary: "借金を使いにくくなると、大きな整備や更新は緊急性の高いものから選ばれます。", items: ["道路補修や公共施設の建替えの先送り", "上下水道設備の更新延期", "除雪、草刈り、公園管理の縮小", "防災設備の更新抑制", "新しい大型事業の延期・中止"], note: "安全に直結する事業が直ちに止まるわけではありませんが、「今すぐ壊れないもの」は後回しになりやすくなります。" },
+    { number: "05", title: "市役所の体制と手続き", summary: "大きな固定費である人件費を抑えるため、職員数、給与、採用、組織が見直されることがあります。", items: ["窓口や電話の待ち時間が増える", "支所の統合・廃止", "補助金審査や許認可に時間がかかる", "専門職・技術職が不足する", "災害、福祉、建築などの対応余力が小さくなる"], note: "財政再生計画には、事務事業の見直しや組織合理化などの歳出削減策を盛り込むことが想定されています。" },
+  ];
+  const nonEvents = ["市町村が会社のように清算・消滅する", "住民が自治体の借金を一括して肩代わりする", "住民の預金や財産が没収される", "市職員全員が一斉に解雇される", "警察、消防、学校、福祉が全面停止する", "国が市長や議会を直接置き換える"];
   return <section className="page risk-page">
-    <PageIntro eyebrow="FISCAL HEALTH LAW" title="財政が悪いと、どうなる？" text="財政健全化法の『イエローカード』と『レッドカード』を、中学生にもわかる言葉で説明します。" />
+    <PageIntro eyebrow="FISCAL HEALTH LAW" title="財政が悪いと、どうなる？" text="財政指標が基準を超えたとき、自治体の運営と住民生活がどう変わるのかを、制度と実例から整理します。" />
 
     <div className="risk-hero">
-      <div><span>まず結論</span><h2>基準を超えると、<br />法律に沿った立て直しが始まります。</h2><p>自治体が突然なくなったり、次の日からすべてのサービスが止まったりする制度ではありません。数字を公表し、原因を調べ、議会で計画を決めて、毎年の進み具合を住民に知らせながら改善します。</p></div>
-      <div className="risk-flow"><div><small>通常</small><b>毎年チェック</b><p>4つの比率を議会と住民に公表</p></div><i>→</i><div className="yellow"><small>イエロー</small><b>早期健全化</b><p>自分たちで計画的に立て直す</p></div><i>→</i><div className="red"><small>レッド</small><b>財政再生</b><p>国の強い関与のもとで再生する</p></div></div>
+      <div className="risk-lead"><span>まず、ここだけ押さえよう</span><h2>財政悪化は、<br />「まちの予算の自由」が<br />小さくなることです。</h2><p>基準を超えると、赤字の解消や借金返済を優先した立て直しが始まります。自治体が突然なくなったり、翌日からすべてのサービスが止まったりする制度ではありません。</p><p><em>重くなるほど、住民のために新しいことを選べる余地が小さくなります。</em></p></div>
+      <div className="risk-flow"><div><small>通常</small><b>毎年チェック</b><p>4つの比率を議会と住民に公表</p></div><i>→</i><div className="yellow"><small>イエロー</small><b>早期健全化</b><p>自治体主導で計画的に立て直す</p></div><i>→</i><div className="red"><small>レッド</small><b>財政再生</b><p>国の強い関与のもとで再生する</p></div></div>
     </div>
 
-    <div className="risk-key"><span>ここは大事</span><div><b>この法律の比率は、基本的に高いほど要注意です。</b><p>「基準を下回ると危ない」のではなく、表にある数値と同じか、それより高くなると法律上の手続きが始まります。</p></div></div>
+    <figure className="risk-visual"><div><span className="eyebrow">VISUAL GUIDE</span><h2>全体像を、1枚で確認する</h2><p>自治体のお金の流れから、早期健全化・財政再生、住民生活への影響までを図解しています。画像を押すと大きく表示できます。</p></div><a href="/fiscal-risk-guide.png" target="_blank" rel="noreferrer"><img src="/fiscal-risk-guide.png" alt="財政が悪化した場合の自治体の対応と住民生活への影響をまとめた図解" loading="lazy" decoding="async" /></a><figcaption>※ 実際の対応は、悪化した原因、赤字額、人口、施設数、国・都道府県の支援などによって異なります。</figcaption></figure>
+
+    <div className="risk-key"><span>基準の読み方</span><div><b>この法律の比率は、基本的に高いほど要注意です。</b><p>「基準を下回ると危ない」のではありません。表の基準と同じか、それより高くなると法律上の手続きが始まります。</p></div></div>
 
     <div className="risk-section-head"><span className="eyebrow">LEGAL THRESHOLDS</span><h2>どの数値でイエロー・レッドになる？</h2><p>イエローは4つの健全化判断比率のうち1つでも基準以上になると対象です。レッドは将来負担比率を除く3つのうち1つでも基準以上になると対象です。赤字比率のイエロー基準に幅があるのは、自治体の財政規模によって計算結果が変わるためです。</p></div>
-    <div className="table-card risk-table-card"><div className="table-scroll"><table className="risk-threshold-table"><thead><tr><th>法律上の指標</th><th>かんたんな意味</th><th>早期健全化基準<br />イエロー</th><th>財政再生基準<br />レッド</th></tr></thead><tbody>{thresholds.map((item) => <tr key={item.name}><td><b>{item.name}</b></td><td>{item.meaning}</td><td className="yellow-cell">{item.yellow}</td><td className="red-cell">{item.red}</td></tr>)}</tbody></table></div></div>
+    <div className="table-card risk-table-card"><div className="table-scroll"><table className="risk-threshold-table"><thead><tr><th>法律上の指標</th><th>意味</th><th>早期健全化基準<br />イエロー</th><th>財政再生基準<br />レッド</th></tr></thead><tbody>{thresholds.map((item) => <tr key={item.name}><td><b>{item.name}</b></td><td>{item.meaning}</td><td className="yellow-cell">{item.yellow}</td><td className="red-cell">{item.red}</td></tr>)}</tbody></table></div></div>
     <p className="risk-table-note">※ 公営企業（水道・下水道など）は、資金不足比率が <b>20%以上</b> になると「経営健全化計画」が必要です。将来負担比率にはレッド基準がありません。</p>
 
+    <div className="risk-section-head"><span className="eyebrow">THE BIG DIFFERENCE</span><h2>早期健全化と財政再生の、大きな違い</h2><p>どちらも計画を作って改善しますが、決定的な違いは「誰が主導し、どこまで自由に予算と借金を決められるか」です。</p></div>
     <div className="risk-outcomes">
-      <article className="yellow"><span>イエローカード</span><h2>早期健全化団体になると</h2><p>まだ自分たちで立て直す段階ですが、法律により次の対応が必要になります。</p><ul><li><b>財政健全化計画</b>を作り、議会で決めて公表する</li><li>計画を総務大臣または都道府県知事へ報告する</li><li>毎年、計画の進み具合を議会と住民へ報告する</li><li>外部の専門家による監査を受ける</li></ul></article>
-      <article className="red"><span>レッドカード</span><h2>財政再生団体になると</h2><p>国の関与がより強くなり、自由に予算や借金を決めにくくなります。</p><ul><li><b>財政再生計画</b>を作り、議会で決めて公表する</li><li>総務大臣と協議し、計画への同意を求められる</li><li>同意がなければ、災害復旧などを除き、原則として新しい地方債を発行できない</li><li>必要に応じて、国から予算変更などの勧告を受ける</li></ul></article>
+      <article className="yellow"><span>イエローカード</span><h2>早期健全化団体</h2><p><b>自治体が自ら立て直す段階です。</b>財政健全化計画を作り、議会の議決を受けて公表します。毎年度の進捗も議会、国または都道府県へ報告します。</p><ul><li>新規事業や公共工事を厳選する</li><li>補助金、イベント、委託事業を見直す</li><li>公共施設を統合・再配置する</li><li>使用料や手数料を見直す</li><li>職員採用、給与、組織を見直す</li></ul><p className="outcome-note">改善が難しい場合は総務大臣や都道府県知事が勧告できますが、基本は自治体主導です。早く回復できれば、市民生活への影響を比較的小さく抑えられる場合もあります。</p></article>
+      <article className="red"><span>レッドカード</span><h2>財政再生団体</h2><p><b>自治体だけでは立て直しが難しい段階です。</b>財政再生計画に基づく予算編成が必要となり、総務大臣の同意や地方債の許可など、国の関与が格段に強くなります。</p><ul><li>赤字解消と借金返済を最優先にする</li><li>計画の内容を国と協議する</li><li>地方債の発行が強く制限される</li><li>計画どおりでなければ変更勧告を受ける</li><li>税・料金・施設・人員を広く見直す</li></ul><p className="outcome-note">予算編成権そのものがなくなるわけではありません。ただし、国の監督下で、計画から外れた新しい政策を選びにくい状態になります。</p></article>
     </div>
+    <div className="table-card comparison-card"><div className="table-scroll"><table className="comparison-table"><thead><tr><th>制度上の違い</th><th>早期健全化団体</th><th>財政再生団体</th></tr></thead><tbody>{comparisonRows.map((row) => <tr key={row[0]}><td><b>{row[0]}</b></td><td>{row[1]}</td><td>{row[2]}</td></tr>)}</tbody></table></div></div>
 
-    <div className="life-impact"><div><span className="eyebrow">FOR DAILY LIFE</span><h2>住民の暮らしには、どう関係する？</h2><p>法律が「このサービスを必ず削る」と一律に決めるわけではありません。ただし、限られたお金で赤字や借金を減らす必要があるため、計画を作る中で次の見直しが検討されることがあります。</p></div><div className="life-impact-grid"><article><b>事業の優先順位</b><p>新しい施設や工事を延期し、本当に急ぐものから行う。</p></article><article><b>サービスと料金</b><p>事業の内容、利用料や手数料を見直す。ただし自動的に値上げされるわけではありません。</p></article><article><b>役所の運営費</b><p>組織、職員配置、委託費などを見直し、支出を抑える。</p></article></div></div>
+    <div className="risk-section-head impact-heading"><span className="eyebrow">FOR DAILY LIFE</span><h2>住民の暮らしに、起こり得ること</h2><p>法律が具体的な増税や施設統合を一律に命令するわけではありません。何を見直すかは、悪化の原因と自治体の計画で変わります。ただし、赤字と借金を減らすため、次のような対応が組み合わされる可能性があります。</p></div>
+    <div className="impact-grid">{impactAreas.map((area) => <article key={area.number}><header><span>{area.number}</span><h3>{area.title}</h3></header><p className="impact-summary">{area.summary}</p><ul>{area.items.map((item) => <li key={item}>{item}</li>)}</ul><p className="impact-note"><b>注意</b>{area.note}</p></article>)}</div>
 
-    <div className="risk-clarifications"><article><h3>経常収支比率が100%を超えたらレッド？</h3><p><b>いいえ。</b> 経常収支比率は重要な注意信号ですが、財政健全化法のイエロー・レッドを直接決める4指標ではありません。</p></article><article><h3>このアプリだけで判定できる？</h3><p><b>できません。</b> 4つの健全化判断比率を表示していますが、法律上の正式な判定は、監査を経て各自治体が公表する資料で必ず確認してください。</p></article></div>
+    <div className="burden-message"><span>市民にとって本当に重い影響</span><blockquote>高い負担を払いながら、以前より不便な行政サービスを受ける期間が長く続くこと。</blockquote><p>単に税金が少し上がることだけではありません。暮らしの負担増とサービス低下が同時に続き、まちの魅力や将来の選択肢まで小さくなることが大きな問題です。</p></div>
 
-    <div className="legal-sources"><div><span className="eyebrow">OFFICIAL SOURCES</span><h2>法律・基準の確認先</h2><p>基準は2026年7月21日時点の現行制度を確認しています。実際の判定は、各自治体が監査を経て公表する健全化判断比率をご確認ください。</p></div><div><a href="https://laws.e-gov.go.jp/law/419AC0000000094" target="_blank" rel="noreferrer">e-Gov「地方公共団体の財政の健全化に関する法律」↗</a><a href="https://laws.e-gov.go.jp/law/419CO0000000397" target="_blank" rel="noreferrer">e-Gov「同法施行令」↗</a></div></div>
+    <div className="risk-section-head"><span className="eyebrow">REAL CASE: YUBARI</span><h2>夕張市で、実際に起きたこと</h2><p>夕張市は全国で唯一の財政再生団体であり、極端な事例です。ただし、財政再生が予算と市民生活にどう現れるかを具体的に示しています。</p></div>
+    <div className="yubari-case">
+      <div className="case-stat-grid"><div><strong>220<span>人</span> → 88<span>人</span></strong><p>一般職員<br />2006年度 → 2009年度</p></div><div><strong>50<span>%</span></strong><p>存続する施設の<br />使用料引上げ</p></div><div><strong>中3<span>校</span> → 1<span>校</span></strong><p>2010年に統合</p></div><div><strong>小6<span>校</span> → 1<span>校</span></strong><p>2011年に統合</p></div></div>
+      <div className="case-detail"><h3>税・料金・施設・職員を、同時に見直しました</h3><ul><li>市民税、固定資産税、軽自動車税などの引上げ</li><li>施設使用料、下水道料金、証明手数料、検診料の引上げ</li><li>家庭ごみの有料化と徴収の強化</li><li>学校や市の施設の統合・閉鎖</li><li>大量退職と職員削減に伴う、国・北海道などからの職員派遣</li></ul><p>夕張市の措置が、ほかの団体にそのまま適用されるわけではありません。赤字額、人口、産業構造、施設数、支援策によって負担の内容は大きく変わります。</p></div>
+    </div>
+    <div className="case-source-row"><a href="https://www.city.yubari.lg.jp/uploaded/attachment/2308.pdf" target="_blank" rel="noreferrer">夕張市「財政再生計画策定に向けた考え方」↗</a><a href="https://www.city.yubari.lg.jp/uploaded/attachment/2294.pdf" target="_blank" rel="noreferrer">夕張市「財政再生計画の実施状況」↗</a><a href="https://www.city.yubari.lg.jp/uploaded/attachment/1656.pdf" target="_blank" rel="noreferrer">夕張市「学校統合後の交通資料」↗</a><a href="https://dl.ndl.go.jp/view/prepareDownload?contentNo=1&itemId=info%3Andljp%2Fpid%2F11018719" target="_blank" rel="noreferrer">国立国会図書館「地方自治体の財政再建」↗</a></div>
+
+    <div className="risk-section-head"><span className="eyebrow">WHY CASES DIFFER</span><h2>同じ早期健全化でも、対応は同じではない</h2><p>基準を超えた原因が違えば、必要な立て直し方も変わります。一般会計の構造的な赤字なのか、病院や下水道なのか、第三セクターなのか、過去の施設整備の借金なのかを見分けることが大切です。</p></div>
+    <div className="case-comparison"><article><span>広い見直しをした例</span><h3>大阪府 泉佐野市</h3><p>職員採用・給与・組織、公共事業、補助金、委託契約、市有地売却まで踏み込んだ実施プランを作成しました。一方で、市民サービスへの影響を極力抑え、不可欠な事業を確保する方針も明記しました。</p><a href="https://www.city.izumisano.lg.jp/kakuka/koushitsu/gyozaisei/nemu/kakonokeikakusyu/kakonokeikakusyu/11895.html" target="_blank" rel="noreferrer">泉佐野市の公式資料 ↗</a></article><article><span>原因を絞って改善した例</span><h3>長野県 王滝村</h3><p>主因は村営観光施設事業の借金返済を一般会計が支えていたことでした。企業債の繰上償還を中心に対応し、計画期間内に実質公債費比率を基準未満へ改善しました。</p><a href="https://www.vill.otaki.nagano.jp/aboutus/keikaku/keikaku/zaiseikennzenka_plan.html" target="_blank" rel="noreferrer">王滝村の公式資料 ↗</a></article></div>
+
+    <div className="risk-section-head"><span className="eyebrow">A POSSIBLE SPIRAL</span><h2>長引くと、悪循環になるおそれがあります</h2></div>
+    <div className="risk-spiral"><div><b>財政が悪化</b><span>収入より支出が多い</span></div><i>→</i><div><b>サービス縮小</b><span>使えるまちの魅力が下がる</span></div><i>→</i><div><b>人口が減る</b><span>若い世代や企業が流出</span></div><i>→</i><div><b>税収が減る</b><span>使える財源がさらに減る</span></div><i>↺</i></div>
+
+    <div className="non-events"><div><span className="eyebrow">WHAT DOES NOT HAPPEN AUTOMATICALLY</span><h2>自動的には、起きないこと</h2><p>自治体そのものは存続します。財政再生の本質は、自治体が消えることではなく、過去の赤字処理を優先するため政策の選択肢が狭くなることです。</p></div><ul>{nonEvents.map((item) => <li key={item}><span>×</span>{item}</li>)}</ul></div>
+
+    <div className="risk-clarifications"><article><h3>経常収支比率が100%を超えたらレッド？</h3><p><b>いいえ。</b> 経常収支比率は重要な注意信号ですが、財政健全化法のイエロー・レッドを直接決める4指標ではありません。</p></article><article><h3>計画に入ったら、必ず全面緊縮？</h3><p><b>一律ではありません。</b> 問題が特定事業に集中していれば、資産売却や繰上償還を中心に改善できる場合もあります。</p></article><article><h3>このアプリだけで正式判定できる？</h3><p><b>できません。</b> 監査を経て各自治体が公表する健全化判断比率と計画を必ず確認してください。</p></article></div>
+
+    <div className="legal-sources"><div><span className="eyebrow">OFFICIAL SOURCES</span><h2>法律・基準・実例の確認先</h2><p>基準と制度は2026年7月22日時点の現行法令を確認しています。実際の判定や対応は、各自治体が監査を経て公表する比率と計画をご確認ください。</p></div><div><a href="https://laws.e-gov.go.jp/law/419AC0000000094" target="_blank" rel="noreferrer">e-Gov「地方公共団体の財政の健全化に関する法律」↗</a><a href="https://laws.e-gov.go.jp/law/419CO0000000397" target="_blank" rel="noreferrer">e-Gov「同法施行令」↗</a><a href="https://www.city.yubari.lg.jp/soshiki/4/1254.html" target="_blank" rel="noreferrer">夕張市「財政再生計画」↗</a></div></div>
   </section>;
 }
 
