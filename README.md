@@ -31,9 +31,9 @@ npm run data:update
 2. CSVに含まれる年度を調べ、直近5年度を自動選択
 3. e-Statと総務省確報から実質赤字比率・連結実質赤字比率を取得
 4. 団体数、47都道府県、欠損、重複、値の範囲、年度の連続性を検査
-5. すべて合格したときだけ `app/official-data.json` を差し替え
+5. すべて合格したときだけ `public/official-data.json` と `app/official-data-meta.json` を差し替え
 
-検査に失敗した場合、公開中のJSONは変更されません。成功時は更新前データを `app/official-data.json.previous` に保存します。
+検査に失敗した場合、公開中のJSONは変更されません。成功時は更新前データを `public/official-data.json.previous` に保存します。
 
 ### 新年度の赤字比率がe-Statにまだない場合
 
@@ -58,7 +58,7 @@ npm run data:check
 npm test
 ```
 
-画面の対象年度、取得日、団体数、出典欄は `official-data.json` の内容から自動表示されるため、年度更新時に画面文言を手修正する必要はありません。
+画面の対象年度、取得日、団体数、出典欄は生成データの内容から自動表示されるため、年度更新時に画面文言を手修正する必要はありません。全国データは `public/official-data.json` から初回表示後に取得し、画面本体のJavaScriptには同梱しません。
 
 ## 主なファイル
 
@@ -66,10 +66,11 @@ npm test
 - `scripts/update-official-data.mjs`: ダウンロード、結合、検査、差し替え
 - `scripts/generate-official-data.mjs`: 表示用JSONの生成
 - `scripts/validate-official-data.mjs`: データ品質検査
-- `app/official-data.json`: アプリが読み込む公式データ
+- `public/official-data.json`: 初回表示後に取得する公式データ
+- `app/official-data-meta.json`: 初期画面に必要な年度・取得日・出典だけを持つ軽量メタデータ
 
 ## 更新時の注意
 
 - 総務省やデジタル庁がファイル名・列名・シート名を変更した場合、更新処理は安全のため停止します。
 - 団体の合併などで団体数が前回から20以上変化した場合も停止します。公表資料を確認してから検査条件を見直してください。
-- `app/official-data.json.previous` から直前のデータへ戻せます。内容確認後に手動で差し替えてください。
+- `public/official-data.json.previous` から直前のデータへ戻せます。内容確認後に手動で差し替えてください。

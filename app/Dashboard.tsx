@@ -1,18 +1,20 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- User-supplied explanatory image is intentionally served at its original resolution. */
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   allMunicipalities,
   benchmarkFor,
   causeAt,
   compositionAt,
+  dataGeneratedAt,
   dataSnapshot,
   formatMetric,
   groupAt,
   healthRatioSnapshot,
   healthRatioSourceUrl,
+  hydrateOfficialData,
   indexForYear,
   isDeficitMetric,
   metricHistory,
@@ -56,7 +58,8 @@ function DownloadButton({ rows, metric, year }: { rows: Municipality[]; metric: 
   function download() {
     const header = ["年度", "団体コード", "団体名", "都道府県", "類似団体区分", metrics[metric].label, "人口"];
     const lines = rows.map((m) => { const value = metricValue(m, metric, year); return [year, m.code, m.name, m.pref, groupAt(m, year), isDeficitMetric(metric) && value === 0 ? "赤字なし" : value ?? "", populationAt(m, year)]; });
-    const csv = "\uFEFF" + [header, ...lines].map((r) => r.join(",")).join("\n");
+    const escapeCsvCell = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
+    const csv = "\uFEFF" + [header, ...lines].map((row) => row.map(escapeCsvCell).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
@@ -68,6 +71,10 @@ function DownloadButton({ rows, metric, year }: { rows: Municipality[]; metric: 
 }
 
 export default function Dashboard() {
+  const [dataStatus, setDataStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [dataRevision, setDataRevision] = useState(0);
+  const [dataRequest, setDataRequest] = useState(0);
+  const [copyStatus, setCopyStatus] = useState<"success" | "error" | null>(null);
   const [view, setView] = useState<View>("ranking");
   const [year, setYear] = useState(years[years.length - 1]);
   const [metric, setMetric] = useState<MetricKey>("ordinaryBalance");
@@ -84,9 +91,29 @@ export default function Dashboard() {
   const [yMetric, setYMetric] = useState<MetricKey>("futureBurden");
   const selected = allMunicipalities.find((m) => m.code === selectedCode) ?? municipalities[0];
 
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/official-data.json?v=${encodeURIComponent(dataGeneratedAt)}`, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error(`公式データを取得できませんでした（${response.status}）`);
+        return response.json();
+      })
+      .then((payload: unknown) => {
+        hydrateOfficialData(payload);
+        setDataRevision((revision) => revision + 1);
+        setDataStatus("ready");
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setDataStatus("error");
+      });
+    return () => controller.abort();
+  }, [dataRequest]);
+
   // URL is an external state source; hydrate filters once after the client mounts.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
+    if (dataStatus !== "ready") return;
     const params = new URLSearchParams(window.location.search);
     const v = params.get("view") as View | null;
     const m = params.get("metric") as MetricKey | null;
@@ -98,10 +125,11 @@ export default function Dashboard() {
     if (municipality && allMunicipalities.some((item) => item.code === municipality)) setSelectedCode(municipality);
     const requestedPref = params.get("prefecture");
     if (requestedPref && allMunicipalities.some((item) => item.pref === requestedPref)) setFocusPref(requestedPref);
-  }, []);
+  }, [dataStatus, dataRevision]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
+    if (dataStatus !== "ready") return;
     const params = new URLSearchParams();
     params.set("view", view);
     params.set("year", String(year));
@@ -109,16 +137,37 @@ export default function Dashboard() {
     if (view === "detail") params.set("municipality", selectedCode);
     if (view === "wakayama") params.set("prefecture", focusPref);
     window.history.replaceState(null, "", `?${params.toString()}`);
-  }, [view, year, metric, selectedCode, focusPref]);
+  }, [dataStatus, view, year, metric, selectedCode, focusPref]);
 
-  const prefs = useMemo(() => ["すべて", ...Array.from(new Set(allMunicipalities.map((m) => m.pref)))], []);
-  const groups = useMemo(() => ["すべて", ...Array.from(new Set(allMunicipalities.map((m) => groupAt(m, year))))], [year]);
-  const filtered = useMemo(() => allMunicipalities
+  const prefs = ["すべて", ...Array.from(new Set(allMunicipalities.map((m) => m.pref)))];
+  const groups = ["すべて", ...Array.from(new Set(allMunicipalities.map((m) => groupAt(m, year))))];
+  const filtered = allMunicipalities
     .filter((m) => (pref === "すべて" || m.pref === pref) && (group === "すべて" || groupAt(m, year) === group))
     .filter((m) => populationAt(m, year) >= population && (m.name.includes(search) || m.pref.includes(search)))
     .filter((m) => metricValue(m, metric, year) != null)
-    .sort((a, b) => ((metricValue(b, metric, year) ?? 0) - (metricValue(a, metric, year) ?? 0)) * (descending ? 1 : -1)),
-  [pref, group, population, search, metric, descending, year]);
+    .sort((a, b) => ((metricValue(b, metric, year) ?? 0) - (metricValue(a, metric, year) ?? 0)) * (descending ? 1 : -1));
+
+  async function copyShareUrl() {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(window.location.href);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = window.location.href;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        const copied = document.execCommand("copy");
+        textarea.remove();
+        if (!copied) throw new Error("copy command failed");
+      }
+      setCopyStatus("success");
+    } catch {
+      setCopyStatus("error");
+    }
+    window.setTimeout(() => setCopyStatus(null), 2200);
+  }
 
   function openDetail(item: Municipality) {
     setSelectedCode(item.code);
@@ -141,7 +190,7 @@ export default function Dashboard() {
         </nav>
         <div className="sidebar-note">
           <span className="status-dot" />
-          <div><b>公式データで表示中</b><small>デジタル庁・総務省 {years[0]}–{years.at(-1)}年度</small></div>
+          <div><b>{dataStatus === "ready" ? "公式データで表示中" : dataStatus === "error" ? "データを取得できません" : "公式データを読込中"}</b><small>デジタル庁・総務省 {years[0]}–{years.at(-1)}年度</small></div>
         </div>
         <div className="sidebar-footer">地方財政状況調査ベース<br />データ取得 {dataSnapshot.replaceAll("-", ".")}</div>
       </aside>
@@ -150,18 +199,23 @@ export default function Dashboard() {
         <header className="topbar">
           <div className="mobile-brand"><b>Fiscal Lens</b><span>財政ダッシュボード</span></div>
           <div className="year-control"><span>表示年度</span><select value={year} onChange={(e) => { setYear(Number(e.target.value)); setGroup("すべて"); }}>{years.map((y) => <option key={y} value={y}>{y}年度</option>)}</select></div>
-          <button className="icon-button" aria-label="共有URLをコピー" onClick={() => navigator.clipboard?.writeText(window.location.href)}>↗</button>
+          {copyStatus && <span className={`copy-status ${copyStatus}`} role="status" aria-live="polite">{copyStatus === "success" ? "コピーしました" : "コピーできませんでした"}</span>}
+          <button className="icon-button" aria-label="共有URLをコピー" onClick={copyShareUrl}>↗</button>
         </header>
 
         <div className="mobile-nav">{nav.map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => setView(item.id)}>{item.label}</button>)}</div>
 
-        {view === "ranking" && <Ranking rows={filtered} year={year} metric={metric} setMetric={setMetric} pref={pref} setPref={setPref} prefs={prefs} group={group} setGroup={setGroup} groups={groups} population={population} setPopulation={setPopulation} descending={descending} setDescending={setDescending} search={search} setSearch={setSearch} openDetail={openDetail} />}
-        {view === "scatter" && <Scatter year={year} xMetric={xMetric} setXMetric={setXMetric} yMetric={yMetric} setYMetric={setYMetric} pref={scatterPref} setPref={setScatterPref} prefs={prefs} search={scatterSearch} setSearch={setScatterSearch} openDetail={openDetail} />}
-        {view === "detail" && <Detail year={year} selected={selected} setSelectedCode={setSelectedCode} metric={metric} setMetric={setMetric} />}
-        {view === "wakayama" && <PrefectureView year={year} pref={focusPref} setPref={setFocusPref} prefs={prefs.filter((item) => item !== "すべて")} openDetail={openDetail} />}
-        {view === "guide" && <BeginnerGuide />}
-        {view === "risk" && <FiscalRiskGuide />}
-        {view === "sources" && <Sources />}
+        {dataStatus === "loading" && <section className="page data-state" aria-live="polite"><span className="data-spinner" /><h1>公式データを読み込んでいます</h1><p>画面本体を先に表示し、全国1,741団体のデータを後から読み込んでいます。</p></section>}
+        {dataStatus === "error" && <section className="page data-state error" role="alert"><h1>公式データを読み込めませんでした</h1><p>通信状況を確認して、もう一度お試しください。</p><button className="button secondary" onClick={() => { setDataStatus("loading"); setDataRequest((request) => request + 1); }}>再読み込み</button></section>}
+        {dataStatus === "ready" && <>
+          {view === "ranking" && <Ranking rows={filtered} year={year} metric={metric} setMetric={setMetric} pref={pref} setPref={setPref} prefs={prefs} group={group} setGroup={setGroup} groups={groups} population={population} setPopulation={setPopulation} descending={descending} setDescending={setDescending} search={search} setSearch={setSearch} openDetail={openDetail} />}
+          {view === "scatter" && <Scatter year={year} xMetric={xMetric} setXMetric={setXMetric} yMetric={yMetric} setYMetric={setYMetric} pref={scatterPref} setPref={setScatterPref} prefs={prefs} search={scatterSearch} setSearch={setScatterSearch} openDetail={openDetail} />}
+          {view === "detail" && <Detail year={year} selected={selected} setSelectedCode={setSelectedCode} metric={metric} setMetric={setMetric} />}
+          {view === "wakayama" && <PrefectureView year={year} pref={focusPref} setPref={setFocusPref} prefs={prefs.filter((item) => item !== "すべて")} openDetail={openDetail} />}
+          {view === "guide" && <BeginnerGuide />}
+          {view === "risk" && <FiscalRiskGuide />}
+          {view === "sources" && <Sources />}
+        </>}
 
         <footer className="main-footer"><span>本サイトは非公式の分析支援ツールです。正確な値は必ず公表元をご確認ください。</span><div><button onClick={() => setView("guide")}>数値の読み方</button><button onClick={() => setView("sources")}>出典・免責を見る →</button></div></footer>
       </main>
@@ -282,13 +336,13 @@ function Ranking(props: {
     </div>
     <div className="table-card">
       <div className="table-head"><div><b>{metrics[metric].label}ランキング</b><span>比較条件に該当する団体</span></div><button className="sort-button" onClick={() => props.setDescending(!props.descending)}>{props.descending ? "高い順 ↓" : "低い順 ↑"}</button></div>
-      <div className="table-scroll"><table><thead><tr><th>順位</th><th>団体</th><th><span className="header-with-help">類似区分<HelpTip label="類似団体区分" text="人口と産業構造などにより総務省が定める正式な比較グループです。年度ごとの公表区分を表示しています。" compact /></span></th><th>指標値</th><th>類似団体平均との差</th><th>前年度差</th><th>{year - years[0] + 1}年トレンド</th><th /></tr></thead>
+      <div className="table-scroll"><table><thead><tr><th>順位</th><th>団体</th><th><span className="header-with-help">類似区分<HelpTip label="類似団体区分" text="人口と産業構造などにより総務省が定める正式な比較グループです。年度ごとの公表区分を表示しています。" compact /></span></th><th>指標値</th><th>{isDeficitMetric(metric) ? <span className="header-with-help">法定基準で確認<HelpTip label="赤字比率の比較" text="赤字比率は、多くの団体が『赤字なし』のため平均差を表示しません。財政健全化法の基準と照らして確認してください。" compact /></span> : "類似団体平均との差"}</th><th>前年度差</th><th>{year - years[0] + 1}年トレンド</th><th /></tr></thead>
         <tbody>{rows.slice(0, 50).map((m, i) => {
           const value = metricValue(m, metric, year); const benchmark = benchmarkFor(m, metric, year); const diff = value != null && benchmark != null ? value - benchmark : null;
           const history = metricHistory(m, metric, year); const previous = history.length > 1 ? history[history.length - 2] : null; const yoy = value != null && previous != null ? value - previous : null;
           const first = history.find((item) => item != null); const good = first != null && value != null && (metrics[metric].better === "low" ? value <= first : value >= first);
           const diffBad = diff != null && (metrics[metric].better === "low" ? diff > 0 : diff < 0); const yoyBad = yoy != null && (metrics[metric].better === "low" ? yoy > 0 : yoy < 0);
-          return <tr key={m.code}><td><span className={`rank ${i < 3 ? "top" : ""}`}>{i + 1}</span></td><td><button className="entity" onClick={() => props.openDetail(m)}><b>{m.name}</b><small>{m.pref} · {populationAt(m, year).toLocaleString()}人</small></button></td><td><GroupTag group={groupAt(m, year)} /></td><td><strong>{formatMetric(value, metric)}</strong></td><td>{diff == null ? <span className="no-data">—</span> : <span className={diffBad ? "delta bad" : "delta good"}>{diff > 0 ? "+" : ""}{diff.toFixed(metrics[metric].digits)}{metrics[metric].unit}</span>}</td><td>{yoy == null ? <span className="no-data">—</span> : <span className={yoyBad ? "delta bad" : "delta good"}>{yoy === 0 ? "→" : yoy > 0 ? "▲" : "▼"} {Math.abs(yoy).toFixed(metrics[metric].digits)}</span>}</td><td><Trend values={history} good={good} /></td><td><button className="row-arrow" aria-label={`${m.name}の詳細`} onClick={() => props.openDetail(m)}>→</button></td></tr>;
+          return <tr key={m.code}><td><span className={`rank ${i < 3 ? "top" : ""}`}>{i + 1}</span></td><td><button className="entity" onClick={() => props.openDetail(m)}><b>{m.name}</b><small>{m.pref} · {populationAt(m, year).toLocaleString()}人</small></button></td><td><GroupTag group={groupAt(m, year)} /></td><td><strong>{formatMetric(value, metric)}</strong></td><td>{isDeficitMetric(metric) ? <span className="no-data">平均との差は非表示</span> : diff == null ? <span className="no-data">—</span> : <span className={diffBad ? "delta bad" : "delta good"}>{diff > 0 ? "+" : ""}{diff.toFixed(metrics[metric].digits)}{metrics[metric].unit}</span>}</td><td>{yoy == null ? <span className="no-data">—</span> : <span className={yoyBad ? "delta bad" : "delta good"}>{yoy === 0 ? "→" : yoy > 0 ? "▲" : "▼"} {Math.abs(yoy).toFixed(metrics[metric].digits)}</span>}</td><td><Trend values={history} good={good} /></td><td><button className="row-arrow" aria-label={`${m.name}の詳細`} onClick={() => props.openDetail(m)}>→</button></td></tr>;
         })}</tbody></table>{rows.length === 0 && <div className="empty">条件に合う団体がありません。フィルタを変更してください。</div>}</div>
     </div>
   </section>;
@@ -297,8 +351,9 @@ function Ranking(props: {
 function Scatter({ year, xMetric, setXMetric, yMetric, setYMetric, pref, setPref, prefs, search, setSearch, openDetail }: { year: number; xMetric: MetricKey; setXMetric: (v: MetricKey) => void; yMetric: MetricKey; setYMetric: (v: MetricKey) => void; pref: string; setPref: (v: string) => void; prefs: string[]; search: string; setSearch: (v: string) => void; openDetail: (m: Municipality) => void }) {
   const plotted = allMunicipalities.filter((m) => (pref === "すべて" || m.pref === pref) && metricValue(m, xMetric, year) != null && metricValue(m, yMetric, year) != null);
   const xValues = plotted.map((m) => metricValue(m, xMetric, year) as number); const yValues = plotted.map((m) => metricValue(m, yMetric, year) as number);
-  const minX = Math.min(...xValues); const maxX = Math.max(...xValues); const minY = Math.min(...yValues); const maxY = Math.max(...yValues);
-  const avgX = xValues.reduce((a, b) => a + b, 0) / xValues.length; const avgY = yValues.reduce((a, b) => a + b, 0) / yValues.length;
+  const hasPoints = plotted.length > 0;
+  const minX = hasPoints ? Math.min(...xValues) : 0; const maxX = hasPoints ? Math.max(...xValues) : 0; const minY = hasPoints ? Math.min(...yValues) : 0; const maxY = hasPoints ? Math.max(...yValues) : 0;
+  const avgX = hasPoints ? xValues.reduce((a, b) => a + b, 0) / xValues.length : null; const avgY = hasPoints ? yValues.reduce((a, b) => a + b, 0) / yValues.length : null;
   const normalizedSearch = search.trim();
   const match = normalizedSearch ? plotted.find((m) => m.name.includes(normalizedSearch)) : undefined;
   return <section className="page">
@@ -306,8 +361,9 @@ function Scatter({ year, xMetric, setXMetric, yMetric, setYMetric, pref, setPref
     <div className="scatter-layout"><div className="chart-card">
       <div className="chart-toolbar"><label><span>X軸</span><select value={xMetric} onChange={(e) => setXMetric(e.target.value as MetricKey)}>{Object.entries(metrics).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></label><span className="cross">×</span><label><span>Y軸</span><select value={yMetric} onChange={(e) => setYMetric(e.target.value as MetricKey)}>{Object.entries(metrics).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></label><label><span>都道府県</span><select value={pref} onChange={(e) => setPref(e.target.value)}>{prefs.map((value) => <option key={value}>{value}</option>)}</select></label><label className="search-filter"><span>団体検索</span><div className="search-field compact"><span>⌕</span><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="団体をハイライト" /></div></label></div>
       <div className="scatter-chart">
-        <div className="danger-zone"><span>注視ゾーン</span></div><div className="axis-line x" style={{ left: `${((avgX - minX) / (maxX - minX || 1)) * 100}%` }} /><div className="axis-line y" style={{ bottom: `${((avgY - minY) / (maxY - minY || 1)) * 100}%` }} />
+        <div className="danger-zone"><span>注視ゾーン</span></div>{avgX != null && <div className="axis-line x" style={{ left: `${((avgX - minX) / (maxX - minX || 1)) * 100}%` }} />}{avgY != null && <div className="axis-line y" style={{ bottom: `${((avgY - minY) / (maxY - minY || 1)) * 100}%` }} />}
         {plotted.map((m) => { const x = metricValue(m, xMetric, year) as number; const y = metricValue(m, yMetric, year) as number; const left = ((x - minX) / (maxX - minX || 1)) * 92 + 4; const bottom = ((y - minY) / (maxY - minY || 1)) * 84 + 7; const highlight = match?.code === m.code; const pointSize = Math.max(9, Math.min(24, Math.sqrt(populationAt(m, year)) / 65)); return <button key={m.code} className={`point ${m.pref === "和歌山県" ? "wakayama" : ""} ${highlight ? "highlight" : ""}`} style={{ left: `${left}%`, bottom: `${bottom}%`, width: `${pointSize}px`, height: `${pointSize}px` }} onClick={() => openDetail(m)} aria-label={`${m.name} ${formatMetric(x, xMetric)} / ${formatMetric(y, yMetric)}`}><span>{m.name}</span></button>; })}
+        {!hasPoints && <div className="scatter-empty">表示できる団体がありません。都道府県または指標を変更してください。</div>}
         <div className="axis-label left">{metrics[yMetric].label} →</div><div className="axis-label bottom">{metrics[xMetric].label} →</div>
       </div><div className="legend"><span><i className="dot teal" />和歌山県</span><span><i className="dot navy" />その他</span><span>破線：表示可能団体の平均</span></div>
     </div><aside className="map-insight"><span className="eyebrow">QUICK READ</span><h2>右上ほど、複合的な負担が大きい</h2><p>水準だけでなく、自治体規模・類似団体平均との差・推移をあわせて確認してください。</p><div className="mini-stat"><span>平均 X</span><b>{formatMetric(avgX, xMetric)}</b></div><div className="mini-stat"><span>平均 Y</span><b>{formatMetric(avgY, yMetric)}</b></div><div className="callout"><b>点の大きさ</b><span>住民基本台帳人口</span></div></aside></div>
@@ -333,7 +389,7 @@ function Detail({ year, selected, setSelectedCode, metric, setMetric }: { year: 
     <PageIntro eyebrow="MUNICIPALITY PROFILE" title="団体カルテ" text={`${year}年度の公式値と、${years[0]}年度からの指標別推移を表示します。`} />
     <div className="entity-picker"><label><span>対象団体</span><select value={selected.code} onChange={(e) => setSelectedCode(e.target.value)}>{allMunicipalities.map((m) => <option key={m.code} value={m.code}>{m.pref}　{m.name}</option>)}</select></label><div><GroupTag group={selectedGroup} accent /><span>{populationAt(selected, year).toLocaleString()}人</span><span>団体コード {selected.code}</span></div></div>
     <div className="profile-hero"><div><span className="eyebrow">FISCAL SNAPSHOT</span><h2>{selected.name}</h2><p>{selected.pref}における経常収支比率順位 <b>{prefRank > 0 ? `${prefRank}位` : "—"}</b> ／ 全国順位 <b>{nationalRank > 0 ? `${nationalRank}位` : "—"}</b></p></div><div className="cause-badge"><span>歳出（性質別）の最大費目</span><strong>{causeAt(selected, year)}</strong><small>人件費・扶助費・公債費の構成比から判定</small></div></div>
-    <div className="metric-grid">{cards.map((key) => { const value = metricValue(selected, key, year); const benchmark = benchmarkFor(selected, key, year); const diff = value != null && benchmark != null ? value - benchmark : null; const isBad = diff != null && (metrics[key].better === "low" ? diff > 0 : diff < 0); const context = key === "actualDeficit" ? "早期健全化基準 11.25～15%" : key === "consolidatedDeficit" ? "早期健全化基準 16.25～20%" : diff == null ? "類似団体平均 —" : `類似団体平均 ${diff > 0 ? "+" : ""}${diff.toFixed(metrics[key].digits)}${metrics[key].unit}`; return <div className="metric-card" key={key}><div><span>{metrics[key].label}</span><HelpTip label={metrics[key].label} text={metricHelp[key]} /></div><strong>{formatMetric(value, key)}</strong><p className={isDeficitMetric(key) && (value ?? 0) > 0 ? "bad-text" : diff == null ? "no-data" : isBad ? "bad-text" : "good-text"}>{context}</p><div className="range"><i style={{ width: value == null || (isDeficitMetric(key) && value === 0) ? "0" : `${Math.min(100, Math.max(8, (value / (key === "fiscalStrength" ? 1.8 : key === "futureBurden" ? 280 : isDeficitMetric(key) ? 20 : 140)) * 100))}%` }} /></div></div>; })}</div>
+    <div className="metric-grid">{cards.map((key) => { const value = metricValue(selected, key, year); const benchmark = benchmarkFor(selected, key, year); const diff = value != null && benchmark != null ? value - benchmark : null; const isBad = diff != null && (metrics[key].better === "low" ? diff > 0 : diff < 0); const deficit = isDeficitMetric(key); const context = key === "actualDeficit" ? "早期健全化基準 11.25～15%" : key === "consolidatedDeficit" ? "早期健全化基準 16.25～20%" : diff == null ? "類似団体平均 —" : `類似団体平均 ${diff > 0 ? "+" : ""}${diff.toFixed(metrics[key].digits)}${metrics[key].unit}`; return <div className="metric-card" key={key}><div><span>{metrics[key].label}</span><HelpTip label={metrics[key].label} text={metricHelp[key]} /></div><strong>{formatMetric(value, key)}</strong><p className={deficit ? (value ?? 0) > 0 ? "bad-text" : "good-text" : diff == null ? "no-data" : isBad ? "bad-text" : "good-text"}>{context}</p><div className="range"><i style={{ width: value == null || (deficit && value === 0) ? "0" : `${Math.min(100, Math.max(8, (value / (key === "fiscalStrength" ? 1.8 : key === "futureBurden" ? 280 : deficit ? 20 : 140)) * 100))}%` }} /></div></div>; })}</div>
     <div className="detail-grid"><div className="panel"><div className="panel-title"><div><span className="eyebrow">METRIC-SPECIFIC TREND</span><h3>{metrics[metric].label}の推移</h3></div><select value={metric} onChange={(e) => setMetric(e.target.value as MetricKey)}>{Object.entries(metrics).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></div><div className="line-chart"><div className="grid-lines" /><div className="trend-columns">{history.map((value, index) => { const height = value == null ? 3 : 18 + ((value - historyMin) / (historyMax - historyMin || 1)) * 62; return <div key={years[index]}><span className={value == null ? "missing-value" : ""} style={{ bottom: `${height}%` }}>{value == null ? "—" : formatMetric(value, metric)}</span><i className={value == null ? "missing" : ""} style={{ height: `${height}%` }} /><small>{years[index]}</small></div>; })}</div></div></div>
       <div className="panel"><div className="panel-title"><div><span className="eyebrow">EXPENDITURE MIX</span><h3>歳出（性質別）の構成</h3></div></div><div className="composition"><div className="donut" style={donutStyle}><b>{year}</b><span>年度</span></div><div className="composition-list"><p><span><i style={{ background: "#12364a" }} />人件費</span><b>{composition.personnel == null ? "—" : `${personnel.toFixed(1)}%`}</b></p><p><span><i style={{ background: "#1b8a88" }} />扶助費</span><b>{composition.assistance == null ? "—" : `${assistance.toFixed(1)}%`}</b></p><p><span><i style={{ background: "#e1765d" }} />公債費</span><b>{composition.debt == null ? "—" : `${debt.toFixed(1)}%`}</b></p><p><span><i style={{ background: "#d8c8a9" }} />その他</span><b>{composition.other == null ? "—" : `${other.toFixed(1)}%`}</b></p></div></div><div className="cause-note"><b>{causeAt(selected, year)}</b><span>デジタル庁・総務省の歳出（性質別）を構成比に換算しています。</span></div></div></div>
     <div className="table-card compact-table"><div className="table-head"><div><b>類似団体との比較</b><span className="group-summary"><GroupTag group={selectedGroup} />{peerRows.length}団体</span></div></div><div className="table-scroll"><table><thead><tr><th>団体</th><th>財政力指数</th><th>経常収支比率</th><th>実質公債費比率</th><th>実質赤字比率</th><th>連結実質赤字比率</th><th>基金残高比率</th></tr></thead><tbody>{peerRows.slice(0, 8).map((m) => <tr key={m.code} className={m.code === selected.code ? "selected-row" : ""}><td><b>{m.name}</b></td><td>{formatMetric(metricValue(m, "fiscalStrength", year), "fiscalStrength")}</td><td>{formatMetric(metricValue(m, "ordinaryBalance", year), "ordinaryBalance")}</td><td>{formatMetric(metricValue(m, "debtService", year), "debtService")}</td><td>{formatMetric(metricValue(m, "actualDeficit", year), "actualDeficit")}</td><td>{formatMetric(metricValue(m, "consolidatedDeficit", year), "consolidatedDeficit")}</td><td>{formatMetric(metricValue(m, "fundBalance", year), "fundBalance")}</td></tr>)}</tbody></table></div></div>

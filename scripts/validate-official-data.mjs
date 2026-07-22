@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-const [input = "app/official-data.json", previousOption, previousPath] = process.argv.slice(2);
+const [input = "public/official-data.json", previousOption, previousPath] = process.argv.slice(2);
 const data = JSON.parse(await readFile(resolve(input), "utf8"));
 const previous = previousOption === "--previous" && previousPath
   ? JSON.parse(await readFile(resolve(previousPath), "utf8"))
@@ -29,7 +29,9 @@ for (const item of municipalities) {
   check(/^\d{5}$/.test(item.c), `不正な団体コード: ${item.c}`);
   check(item.g?.length === data.years.length, `${item.c} 類似団体区分の年度数が不一致です`);
   check(item.pop?.length === data.years.length, `${item.c} 人口の年度数が不一致です`);
-  check(item.comp && ["pe", "a", "d", "o"].every((key) => item.comp[key]?.length === data.years.length), `${item.c} 歳出構成の年度数が不一致です`);
+  check(item.comp && ["a", "d", "o"].every((key) => item.comp[key]?.length === data.years.length), `${item.c} 歳出構成の年度数が不一致です`);
+  check(!("size" in item), `${item.c} に未使用の size が残っています`);
+  check(!("pe" in item.comp), `${item.c} の人件費比率が重複しています`);
   for (const key of metricKeys) check(item.v?.[key]?.length === data.years.length, `${item.c} 指標 ${key} の年度数が不一致です`);
 
   for (let index = 0; index < data.years.length; index += 1) {
@@ -42,7 +44,7 @@ for (const item of municipalities) {
     check(item.v.d[index] >= -100 && item.v.d[index] <= 100, `${label} 実質公債費比率が想定範囲外です`);
     check(item.v.a[index] >= 0 && item.v.a[index] <= 100, `${label} 実質赤字比率が想定範囲外です`);
     check(item.v.c[index] >= 0 && item.v.c[index] <= 100, `${label} 連結実質赤字比率が想定範囲外です`);
-    const parts = [item.comp.pe[index], item.comp.a[index], item.comp.d[index], item.comp.o[index]];
+    const parts = [item.v.pe[index], item.comp.a[index], item.comp.d[index], item.comp.o[index]];
     if (parts.every(Number.isFinite)) {
       const total = parts.reduce((sum, value) => sum + value, 0);
       check(Math.abs(total - 100) <= 0.2, `${label} 歳出構成の合計が100%ではありません: ${total}`);

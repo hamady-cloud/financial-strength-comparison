@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const data = JSON.parse(await readFile(new URL("../app/official-data.json", import.meta.url), "utf8"));
+const data = JSON.parse(await readFile(new URL("../public/official-data.json", import.meta.url), "utf8"));
 
 test("official snapshot has complete municipality-year grain", () => {
   assert.equal(data.years.length, 5);
@@ -35,10 +35,12 @@ test("statutory deficit ratios retain five-year official series", () => {
 
 test("derived ratios and expenditure compositions pass range checks", () => {
   for (const municipality of data.municipalities) {
+    assert.ok(!("size" in municipality));
+    assert.ok(!("pe" in municipality.comp));
     for (const value of municipality.v.r) assert.ok(value == null || value >= 0);
     for (const value of municipality.v.pe) assert.ok(value == null || (value >= 0 && value <= 100));
     for (let index = 0; index < data.years.length; index += 1) {
-      const parts = [municipality.comp.pe[index], municipality.comp.a[index], municipality.comp.d[index], municipality.comp.o[index]];
+      const parts = [municipality.v.pe[index], municipality.comp.a[index], municipality.comp.d[index], municipality.comp.o[index]];
       if (parts.every((value) => value != null)) {
         const total = parts.reduce((sum, value) => sum + value, 0);
         assert.ok(Math.abs(total - 100) <= 0.2, `${municipality.c} ${data.years[index]} composition=${total}`);

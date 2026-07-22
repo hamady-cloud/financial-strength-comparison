@@ -16,11 +16,12 @@ function parseArguments(argv) {
 
 const { positional, options } = parseArguments(process.argv.slice(2));
 if (!positional[0] || !options["health-data"] || !options.snapshot) {
-  throw new Error("Usage: node scripts/generate-official-data.mjs <csv-directory> [output] --health-data <json> --snapshot <YYYY-MM-DD> [--source-url <url>]");
+  throw new Error("Usage: node scripts/generate-official-data.mjs <csv-directory> [output] --health-data <json> --snapshot <YYYY-MM-DD> [--source-url <url>] [--meta-output <json>]");
 }
 
 const inputDir = resolve(positional[0]);
-const outputPath = resolve(positional[1] ?? "app/official-data.json");
+const outputPath = resolve(positional[1] ?? "public/official-data.json");
+const metaOutputPath = options["meta-output"] ? resolve(options["meta-output"]) : positional[1] ? null : resolve("app/official-data-meta.json");
 const healthData = JSON.parse(await readFile(resolve(options["health-data"]), "utf8"));
 const records = new Map();
 const groupAverages = {};
@@ -89,9 +90,9 @@ function ensureRecord(row) {
       p: row["都道府県名"],
       g: emptySeries(),
       pop: emptySeries(),
-      size: emptySeries(),
+      _size: emptySeries(),
       v: { f: emptySeries(), o: emptySeries(), d: emptySeries(), b: emptySeries(), a: emptySeries(), c: emptySeries(), r: emptySeries(), pe: emptySeries() },
-      comp: { pe: emptySeries(), a: emptySeries(), d: emptySeries(), o: emptySeries() },
+      comp: { a: emptySeries(), d: emptySeries(), o: emptySeries() },
       _funds: years.map(() => 0),
       _flow: years.map(() => ({ total: 0, personnel: 0, assistance: 0, debt: 0 })),
     });
@@ -105,7 +106,7 @@ for (const row of masterRows) {
   const record = ensureRecord(row);
   record.g[index] = row["類似団体区分"] || null;
   record.pop[index] = numberOrNull(row["人口数_人"]);
-  record.size[index] = numberOrNull(row["標準財政規模_千円"]);
+  record._size[index] = numberOrNull(row["標準財政規模_千円"]);
 }
 
 const indicatorMap = {
@@ -154,12 +155,11 @@ await forEachCsv("finance_local_finance_data_table_flow.csv", (row) => {
 
 for (const record of records.values()) {
   for (let index = 0; index < years.length; index += 1) {
-    const size = record.size[index];
+    const size = record._size[index];
     if (size && record._funds[index] >= 0) record.v.r[index] = Number((record._funds[index] / size * 100).toFixed(1));
     const flow = record._flow[index];
     if (flow.total > 0) {
       record.v.pe[index] = Number((flow.personnel / flow.total * 100).toFixed(1));
-      record.comp.pe[index] = Number((flow.personnel / flow.total * 100).toFixed(1));
       record.comp.a[index] = Number((flow.assistance / flow.total * 100).toFixed(1));
       record.comp.d[index] = Number((flow.debt / flow.total * 100).toFixed(1));
       record.comp.o[index] = Number(((flow.total - flow.personnel - flow.assistance - flow.debt) / flow.total * 100).toFixed(1));
@@ -170,6 +170,7 @@ for (const record of records.values()) {
   }
   delete record._funds;
   delete record._flow;
+  delete record._size;
 }
 
 const municipalities = [...records.values()].sort((a, b) => a.c.localeCompare(b.c, "ja"));
@@ -189,4 +190,17 @@ const output = {
 };
 
 await writeFile(outputPath, JSON.stringify(output), "utf8");
+if (metaOutputPath) {
+  const metadata = {
+    snapshot: output.snapshot,
+    generatedAt: output.generatedAt,
+    source: output.source,
+    sourceUrl: output.sourceUrl,
+    healthRatioSnapshot: output.healthRatioSnapshot,
+    healthRatioSource: output.healthRatioSource,
+    healthRatioSourceUrl: output.healthRatioSourceUrl,
+    years: output.years,
+  };
+  await writeFile(metaOutputPath, `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
+}
 console.log(`Wrote ${municipalities.length} municipalities to ${basename(outputPath)} (${years[0]}-${years.at(-1)})`);

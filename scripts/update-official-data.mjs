@@ -12,7 +12,8 @@ const projectDir = resolve(scriptDir, "..");
 const config = JSON.parse(await readFile(join(scriptDir, "data-sources.json"), "utf8"));
 const options = parseArguments(process.argv.slice(2));
 const tempDir = await mkdtemp(join(tmpdir(), "fiscal-lens-update-"));
-const currentOutput = resolve(options.output ?? join(projectDir, "app/official-data.json"));
+const currentOutput = resolve(options.output ?? join(projectDir, "public/official-data.json"));
+const currentMetaOutput = resolve(options["meta-output"] ?? join(projectDir, "app/official-data-meta.json"));
 
 try {
   const source = options["input-dir"]
@@ -32,10 +33,11 @@ try {
   const health = await buildHealthRatios(years, targets, tempDir);
   const healthPath = join(tempDir, "health-ratios.json");
   const candidatePath = join(tempDir, "official-data.candidate.json");
+  const candidateMetaPath = join(tempDir, "official-data-meta.candidate.json");
   await writeFile(healthPath, JSON.stringify(health), "utf8");
   runNode([
     join(scriptDir, "generate-official-data.mjs"), csvRoot, candidatePath,
-    "--health-data", healthPath, "--snapshot", source.snapshot, "--source-url", source.url,
+    "--health-data", healthPath, "--snapshot", source.snapshot, "--source-url", source.url, "--meta-output", candidateMetaPath,
   ]);
   const validatorArgs = [join(scriptDir, "validate-official-data.mjs"), candidatePath];
   try { await access(currentOutput); validatorArgs.push("--previous", currentOutput); } catch { /* first generation */ }
@@ -44,6 +46,7 @@ try {
   const backupPath = `${currentOutput}.previous`;
   try { await cp(currentOutput, backupPath); } catch { /* first generation */ }
   await cp(candidatePath, currentOutput, { force: true });
+  await cp(candidateMetaPath, currentMetaOutput, { force: true });
   console.log(`更新完了: ${years[0]}–${years.at(-1)}年度 / 取得日 ${source.snapshot}`);
   console.log(`更新前データの控え: ${backupPath}`);
 } finally {

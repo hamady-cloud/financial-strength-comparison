@@ -1,4 +1,4 @@
-import officialData from "./official-data.json";
+import officialDataMeta from "./official-data-meta.json";
 
 export type MetricKey =
   | "fiscalStrength"
@@ -34,18 +34,22 @@ type CompactMunicipality = {
   g: Array<string | null>;
   pop: Array<number | null>;
   v: Record<"f" | "o" | "d" | "b" | "a" | "c" | "r" | "pe", Array<number | null>>;
-  comp: Record<"pe" | "a" | "d" | "o", Array<number | null>>;
+  comp: Record<"a" | "d" | "o", Array<number | null>>;
 };
 
-const compactRecords = officialData.municipalities as CompactMunicipality[];
+type OfficialDataPayload = {
+  groupAverages: Record<string, Partial<Record<"f" | "o" | "d" | "b", Array<number | null>>>>;
+  municipalities: CompactMunicipality[];
+};
 
-export const years = officialData.years;
-export const dataSnapshot = officialData.snapshot;
-export const dataSource = officialData.source;
-export const dataSourceUrl = officialData.sourceUrl;
-export const healthRatioSnapshot = officialData.healthRatioSnapshot;
-export const healthRatioSource = officialData.healthRatioSource;
-export const healthRatioSourceUrl = officialData.healthRatioSourceUrl;
+export const years = officialDataMeta.years;
+export const dataSnapshot = officialDataMeta.snapshot;
+export const dataGeneratedAt = officialDataMeta.generatedAt;
+export const dataSource = officialDataMeta.source;
+export const dataSourceUrl = officialDataMeta.sourceUrl;
+export const healthRatioSnapshot = officialDataMeta.healthRatioSnapshot;
+export const healthRatioSource = officialDataMeta.healthRatioSource;
+export const healthRatioSourceUrl = officialDataMeta.healthRatioSourceUrl;
 
 export const metrics: Record<MetricKey, { label: string; unit: string; better: "high" | "low"; digits: number; official: boolean }> = {
   fiscalStrength: { label: "財政力指数", unit: "", better: "high", digits: 2, official: true },
@@ -58,31 +62,43 @@ export const metrics: Record<MetricKey, { label: string; unit: string; better: "
   personnel: { label: "人件費比率（歳出）", unit: "%", better: "low", digits: 1, official: false },
 };
 
-export const allMunicipalities: Municipality[] = compactRecords.map((record) => ({
-  code: record.c,
-  name: record.n,
-  pref: record.p,
-  groups: record.g,
-  populations: record.pop,
-  history: {
-    fiscalStrength: record.v.f,
-    ordinaryBalance: record.v.o,
-    debtService: record.v.d,
-    futureBurden: record.v.b,
-    actualDeficit: record.v.a,
-    consolidatedDeficit: record.v.c,
-    fundBalance: record.v.r,
-    personnel: record.v.pe,
-  },
-  composition: {
-    personnel: record.comp.pe,
-    assistance: record.comp.a,
-    debt: record.comp.d,
-    other: record.comp.o,
-  },
-}));
+export const allMunicipalities: Municipality[] = [];
+export const municipalities: Municipality[] = [];
+const compactGroupAverages: OfficialDataPayload["groupAverages"] = {};
 
-export const municipalities = allMunicipalities.filter((item) => item.pref === "和歌山県");
+export function hydrateOfficialData(input: unknown) {
+  if (!input || typeof input !== "object") throw new Error("公式データの形式が正しくありません。");
+  const payload = input as Partial<OfficialDataPayload>;
+  if (!Array.isArray(payload.municipalities) || !payload.groupAverages) throw new Error("公式データに必要な項目がありません。");
+
+  for (const key of Object.keys(compactGroupAverages)) delete compactGroupAverages[key];
+  Object.assign(compactGroupAverages, payload.groupAverages);
+  const parsedMunicipalities = payload.municipalities.map((record) => ({
+    code: record.c,
+    name: record.n,
+    pref: record.p,
+    groups: record.g,
+    populations: record.pop,
+    history: {
+      fiscalStrength: record.v.f,
+      ordinaryBalance: record.v.o,
+      debtService: record.v.d,
+      futureBurden: record.v.b,
+      actualDeficit: record.v.a,
+      consolidatedDeficit: record.v.c,
+      fundBalance: record.v.r,
+      personnel: record.v.pe,
+    },
+    composition: {
+      personnel: record.v.pe,
+      assistance: record.comp.a,
+      debt: record.comp.d,
+      other: record.comp.o,
+    },
+  }));
+  allMunicipalities.splice(0, allMunicipalities.length, ...parsedMunicipalities);
+  municipalities.splice(0, municipalities.length, ...parsedMunicipalities.filter((item) => item.pref === "和歌山県"));
+}
 
 export function indexForYear(year: number) {
   const index = years.indexOf(year);
@@ -116,7 +132,6 @@ export function isDeficitMetric(key: MetricKey) {
   return key === "actualDeficit" || key === "consolidatedDeficit";
 }
 
-const compactGroupAverages = officialData.groupAverages as Record<string, Partial<Record<"f" | "o" | "d" | "b", Array<number | null>>>>;
 const officialMetricCodes: Partial<Record<MetricKey, "f" | "o" | "d" | "b">> = {
   fiscalStrength: "f",
   ordinaryBalance: "o",
@@ -125,6 +140,7 @@ const officialMetricCodes: Partial<Record<MetricKey, "f" | "o" | "d" | "b">> = {
 };
 
 export function benchmarkFor(item: Municipality, key: MetricKey, year = years[years.length - 1]) {
+  if (isDeficitMetric(key)) return null;
   const index = indexForYear(year);
   const group = groupAt(item, year);
   const officialCode = officialMetricCodes[key];

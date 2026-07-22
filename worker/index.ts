@@ -1,10 +1,9 @@
-/** Cloudflare Worker entry point for the vinext-starter template. */
+/** Cloudflare Worker entry point for Fiscal Lens. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 
 interface Env {
-  ASSETS: Fetcher;
-  DB: D1Database;
+  ASSETS: { fetch(request: Request): Promise<Response> };
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -29,6 +28,13 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    if (url.pathname === "/official-data.json") {
+      const response = await env.ASSETS.fetch(request);
+      const headers = new Headers(response.headers);
+      headers.set("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+    }
+
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
       return handleImageOptimization(request, {
@@ -40,24 +46,7 @@ const worker = {
       }, allowedWidths);
     }
 
-    const response = await handler.fetch(request, env, ctx);
-
-    // Keep the application shell fresh after a deployment. Hashed JS/CSS assets
-    // remain cacheable, while HTML navigation always reflects the latest build.
-    const acceptsHtml = request.headers.get("accept")?.includes("text/html");
-    if (acceptsHtml) {
-      const headers = new Headers(response.headers);
-      headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
-      headers.set("CDN-Cache-Control", "no-store");
-      headers.set("Pragma", "no-cache");
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-      });
-    }
-
-    return response;
+    return handler.fetch(request, env, ctx);
   },
 };
 

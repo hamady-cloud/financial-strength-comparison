@@ -1,5 +1,3 @@
-@import "tailwindcss";
-
 :root {
   --ink: #12364a;
   --ink-2: #244b5f;
@@ -44,7 +42,9 @@ main { min-height: 100vh; margin-left: 256px; }
 .year-control { display: flex; gap: 10px; align-items: center; font-size: 11px; color: var(--muted); }
 .year-control select { border: 0; background: transparent; color: var(--ink); font-weight: 700; cursor: pointer; }
 .icon-button { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: white; cursor: pointer; }
+.copy-status { position:fixed;top:70px;right:42px;z-index:30;border:1px solid var(--line);background:#fff;padding:9px 13px;box-shadow:0 10px 28px rgba(18,54,74,.14);color:var(--teal);font-size:11px;font-weight:850; }.copy-status.error { color:var(--coral); }
 .page { max-width: 1480px; margin: 0 auto; padding: 54px 52px 72px; }
+.data-state { min-height:calc(100vh - 150px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center; }.data-state h1 { margin:18px 0 8px;font:600 26px/1.5 Georgia,"Yu Mincho",serif; }.data-state p { color:var(--muted);font-size:12px;line-height:1.8;margin:0 0 18px; }.data-spinner { width:34px;height:34px;border:3px solid #d9e8e4;border-top-color:var(--teal);border-radius:50%;animation:data-spin .8s linear infinite; }.data-state.error h1 { color:var(--coral); } @keyframes data-spin { to { transform:rotate(360deg); } }
 .page-intro { display: flex; justify-content: space-between; gap: 30px; align-items: flex-end; margin-bottom: 32px; }
 .page-intro h1 { font-family: Georgia, "Yu Mincho", serif; font-weight: 500; font-size: clamp(30px, 3vw, 44px); margin: 7px 0 8px; letter-spacing: -.02em; }
 .page-intro p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.8; }
@@ -100,6 +100,7 @@ tbody tr:hover { background: #fcfdfb; }
 .chart-toolbar .search-field { margin-left: auto; max-width: 200px; }
 .cross { height: 37px; display: grid; place-items: center; color: var(--muted); }
 .scatter-chart { height: 520px; margin: 28px 28px 16px 46px; border-left: 1px solid var(--ink); border-bottom: 1px solid var(--ink); position: relative; background-image: linear-gradient(#edf1ef 1px, transparent 1px), linear-gradient(90deg, #edf1ef 1px, transparent 1px); background-size: 20% 20%; }
+.scatter-empty { position:absolute;inset:0;display:grid;place-items:center;padding:24px;color:var(--muted);font-size:12px;font-weight:750;text-align:center; }
 .danger-zone { position: absolute; inset: 0 0 50% 50%; background: rgba(223,116,94,.08); border: 1px dashed rgba(223,116,94,.25); }
 .danger-zone span { position: absolute; right: 10px; top: 8px; color: var(--coral); font-size: 9px; font-weight: 700; }
 .axis-line { position: absolute; border-color: #75909a; border-style: dashed; opacity: .7; }
