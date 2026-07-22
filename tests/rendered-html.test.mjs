@@ -55,6 +55,10 @@ test("keeps data and methodology labels explicit", async () => {
   assert.match(dashboard, /自治体だけでは立て直しが難しい段階/);
   assert.match(dashboard, /fiscal-risk-guide\.png/);
   assert.match(dashboard, /夕張市で、実際に起きたこと/);
+  assert.match(dashboard, /中学校3/);
+  assert.match(dashboard, /小学校6/);
+  assert.doesNotMatch(dashboard, /中3<span/);
+  assert.doesNotMatch(dashboard, /小6<span/);
   assert.match(dashboard, /大阪府 泉佐野市/);
   assert.match(dashboard, /長野県 王滝村/);
   assert.doesNotMatch(dashboard, /中学生にもわかる/);
