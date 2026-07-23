@@ -1,0 +1,129 @@
+name: 年次財政データ更新
+
+on:
+  schedule:
+    # 毎年7月1日 03:17（日本時間）。混雑しやすい毎時0分を避ける。
+    - cron: "17 18 30 6 *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "同じ年度の訂正版も取り込む"
+        required: false
+        type: boolean
+        default: false
+      health_page:
+        description: "未登録年度の総務省「健全化判断比率・資金不足比率（確報）」ページURL"
+        required: false
+        type: string
+      health_published_at:
+        description: "上記ページの公表日（YYYY-MM-DD）"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: annual-fiscal-data-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: 公式データを取得・検査・反映
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TZ: Asia/Tokyo
+      FORCE_UPDATE: ${{ inputs.force || 'false' }}
+      HEALTH_PAGE_URL: ${{ inputs.health_page || '' }}
+      HEALTH_PUBLISHED_AT: ${{ inputs.health_published_at || '' }}
+
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Node.jsを準備
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 依存関係をインストール
+        run: npm ci
+
+      - name: 市町村・都道府県データを更新
+        run: npm run data:update:annual
+
+      - name: 品質検査と本番ビルド
+        run: npm test
+
+      - name: 更新差分を確認
+        id: changes
+        shell: bash
+        run: |
+          git add \
+            public/official-data.json \
+            public/prefectural-data.json \
+            app/official-data-meta.json \
+            app/prefectural-data-meta.json
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "新年度または訂正版のデータはありませんでした。" >> "$GITHUB_STEP_SUMMARY"
+          else
+            latest_year="$(node -p "JSON.parse(require('fs').readFileSync('public/official-data.json','utf8')).years.at(-1)")"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "latest_year=$latest_year" >> "$GITHUB_OUTPUT"
+            echo "${latest_year}年度データへの更新差分を検出しました。" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: 検査済みデータを既定ブランチへ反映
+        if: steps.changes.outputs.changed == 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(data): update fiscal data to ${{ steps.changes.outputs.latest_year }}"
+          git push origin "HEAD:${{ github.event.repository.default_branch }}"
+
+      - name: 失敗内容をIssueで通知
+        if: failure()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const year = new Date().getUTCFullYear();
+            const title = `[自動更新失敗] 地方財政データ ${year}`;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              "年次財政データ更新が失敗しました。",
+              "",
+              `- 実行結果: ${runUrl}`,
+              `- 実行日時: ${new Date().toISOString()}`,
+              "",
+              "デジタル庁・総務省の公開形式変更、年度の公開時期のずれ、または新年度の健全化判断比率ページ未登録が考えられます。",
+              "総務省の確報ページが未登録の場合は、Actionsの「Run workflow」からページURLと公表日を入力して再実行してください。",
+            ].join("\n");
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              per_page: 100,
+            });
+            const existing = issues.find((issue) => !issue.pull_request && issue.title === title);
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+              });
+            }

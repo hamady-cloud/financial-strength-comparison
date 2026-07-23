@@ -42,3 +42,4 @@ next-env.d.ts
 /outputs/
 /work/
 /public/official-data.json.previous
+/public/prefectural-data.json.previous

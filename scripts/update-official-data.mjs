@@ -173,7 +173,9 @@ async function buildHealthRatios(years, targets, directory) {
     }
 
     let annual = config.annualHealthRatios?.[year];
-    if (!annual && year === years.at(-1) && options["health-page"]) annual = { pageUrl: options["health-page"] };
+    if (!annual && year === years.at(-1) && options["health-page"]) {
+      annual = { pageUrl: options["health-page"], publishedAt: options["health-published-at"] };
+    }
     if (!annual) throw new Error(`${year}年度の実質赤字比率・連結実質赤字比率の公表元が未登録です。scripts/data-sources.json に追加するか --health-page URL を指定してください。`);
     if (annual.allClear === true) {
       yearly[year].source = annual.pageUrl;

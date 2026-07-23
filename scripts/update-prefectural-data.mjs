@@ -103,7 +103,10 @@ async function buildHealth(years, directory) {
   const yearly = {};
   const sources = [];
   for (const year of years) {
-    const source = config.prefecturalAnnualHealthRatios?.[year];
+    let source = config.prefecturalAnnualHealthRatios?.[year];
+    if (!source && year === years.at(-1) && options["health-page"]) {
+      source = { pageUrl: options["health-page"], publishedAt: options["health-published-at"] };
+    }
     if (!source) throw new Error(`${year}年度の総務省確報ページが未登録です`);
     console.log(`${year}年度の都道府県健全化判断比率を取得しています…`);
     if (source.allClear === true) {
