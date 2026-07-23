@@ -1,6 +1,6 @@
-# Fiscal Lens — 市町村財政ダッシュボード
+# Fiscal Lens — 地方財政ダッシュボード
 
-全国の市町村財政を、ランキング・指標マップ・団体カルテ・都道府県ビューで比較するWebアプリです。表示データはデジタル庁、総務省、e-Statの公式公表値から生成します。
+全国の市町村と47都道府県の財政を、ランキング・指標マップ・団体カルテ・地域ビューで比較するWebアプリです。画面上部のスイッチで市町村版と都道府県版を切り替えます。表示データはデジタル庁、総務省、e-Statの公式公表値から生成します。
 
 ## ローカル起動
 
@@ -19,11 +19,19 @@ npm test
 
 ## 新しい年度への更新
 
-デジタル庁の「地方財政（市町村ごと）データテーブル」に新しいZIPが公開された後、次の1コマンドを実行します。
+デジタル庁の「地方財政（市町村ごと）」に新しいZIPが公開された後、次のコマンドを実行します。
 
 ```bash
 npm run data:update
 ```
+
+「地方財政（都道府県ごと）」の更新は次のコマンドです。
+
+```bash
+npm run data:update:prefectures
+```
+
+両方の新年度が公開されたときは、市町村版を先に更新してください。都道府県版の人口は、市町村版の住民基本台帳人口を都道府県単位に集計するためです。
 
 このコマンドは次の処理を自動で行います。
 
@@ -31,7 +39,7 @@ npm run data:update
 2. CSVに含まれる年度を調べ、直近5年度を自動選択
 3. e-Statと総務省確報から実質赤字比率・連結実質赤字比率を取得
 4. 団体数、47都道府県、欠損、重複、値の範囲、年度の連続性を検査
-5. すべて合格したときだけ `public/official-data.json` と `app/official-data-meta.json` を差し替え
+5. すべて合格したときだけ表示用JSONと軽量メタデータを差し替え
 
 検査に失敗した場合、公開中のJSONは変更されません。成功時は更新前データを `public/official-data.json.previous` に保存します。
 
@@ -55,6 +63,7 @@ npm run data:update -- --input-dir "CSVフォルダー" --snapshot YYYY-MM-DD
 
 ```bash
 npm run data:check
+npm run data:check:prefectures
 npm test
 ```
 
@@ -64,10 +73,15 @@ npm test
 
 - `scripts/data-sources.json`: 公開元URLと年度別の赤字比率確報
 - `scripts/update-official-data.mjs`: ダウンロード、結合、検査、差し替え
+- `scripts/update-prefectural-data.mjs`: 都道府県版のダウンロード、結合、検査、差し替え
 - `scripts/generate-official-data.mjs`: 表示用JSONの生成
+- `scripts/generate-prefectural-data.mjs`: 都道府県版JSONの生成
 - `scripts/validate-official-data.mjs`: データ品質検査
+- `scripts/validate-prefectural-data.mjs`: 47都道府県・年度・指標・構成比の品質検査
 - `public/official-data.json`: 初回表示後に取得する公式データ
+- `public/prefectural-data.json`: 初回表示後に取得する都道府県公式データ
 - `app/official-data-meta.json`: 初期画面に必要な年度・取得日・出典だけを持つ軽量メタデータ
+- `app/prefectural-data-meta.json`: 都道府県版の軽量メタデータ
 
 ## 更新時の注意
 

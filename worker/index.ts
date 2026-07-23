@@ -28,7 +28,7 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname === "/official-data.json") {
+    if (url.pathname === "/official-data.json" || url.pathname === "/prefectural-data.json") {
       const response = await env.ASSETS.fetch(request);
       const headers = new Headers(response.headers);
       headers.set("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");

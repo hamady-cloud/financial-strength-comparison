@@ -10,9 +10,11 @@
     "build": "vinext build",
     "start": "vinext start",
     "data:update": "node scripts/update-official-data.mjs",
+    "data:update:prefectures": "node scripts/update-prefectural-data.mjs",
     "data:check": "node scripts/validate-official-data.mjs public/official-data.json",
-    "test:data": "node --test tests/official-data.test.mjs",
-    "test": "npm run data:check && npm run test:data && npm run build && node --test tests/rendered-html.test.mjs",
+    "data:check:prefectures": "node scripts/validate-prefectural-data.mjs public/prefectural-data.json",
+    "test:data": "node --test tests/official-data.test.mjs tests/prefectural-data.test.mjs",
+    "test": "npm run data:check && npm run data:check:prefectures && npm run test:data && npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },
   "dependencies": {

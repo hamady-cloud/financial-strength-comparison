@@ -25,10 +25,11 @@ test("renders the fiscal dashboard shell", async () => {
 });
 
 test("keeps data and methodology labels explicit", async () => {
-  const [dashboard, data, officialData, generator, worker] = await Promise.all([
+  const [dashboard, data, officialData, prefecturalData, generator, worker] = await Promise.all([
     readFile(new URL("../app/Dashboard.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/data.ts", import.meta.url), "utf8"),
     readFile(new URL("../public/official-data.json", import.meta.url), "utf8"),
+    readFile(new URL("../public/prefectural-data.json", import.meta.url), "utf8"),
     readFile(new URL("../scripts/generate-official-data.mjs", import.meta.url), "utf8"),
     readFile(new URL("../worker/index.ts", import.meta.url), "utf8"),
   ]);
@@ -38,17 +39,21 @@ test("keeps data and methodology labels explicit", async () => {
   assert.match(dashboard, /escapeCsvCell/);
   assert.match(dashboard, /コピーしました/);
   assert.match(dashboard, /official-data\.json\?v=/);
+  assert.match(dashboard, /prefectural-data\.json\?v=/);
+  assert.match(dashboard, /市町村版/);
+  assert.match(dashboard, /都道府県版/);
+  assert.match(dashboard, /aria-pressed=\{scope === "prefecture"\}/);
   assert.match(dashboard, /平均との差は非表示/);
   assert.match(dashboard, /やさしい指標解説/);
-  assert.match(dashboard, /まちの大きな家計簿/);
+  assert.match(dashboard, /地域の大きな家計簿/);
   assert.match(dashboard, /読み間違いに注意/);
   assert.match(dashboard, /const normalizedSearch = search\.trim\(\)/);
   assert.match(dashboard, /normalizedSearch \? plotted\.find/);
-  assert.match(dashboard, /<span>都道府県<\/span><select value=\{pref\}/);
+  assert.match(dashboard, /isPrefecture \? "地域" : "都道府県"/);
   assert.match(dashboard, /className="search-filter"/);
   assert.match(dashboard, /都道府県ビュー/);
   assert.match(dashboard, /function PrefectureView/);
-  assert.match(dashboard, /allMunicipalities\.filter\(\(item\) => item\.pref === pref\)/);
+  assert.match(dashboard, /entities\.filter\(\(item\) => item\.pref === pref\)/);
   assert.match(dashboard, /財政悪化でどうなる？/);
   assert.match(dashboard, /function FiscalRiskGuide/);
   assert.match(dashboard, /実質赤字比率/);
@@ -73,13 +78,19 @@ test("keeps data and methodology labels explicit", async () => {
   assert.match(data, /consolidatedDeficit/);
   assert.doesNotMatch(data, /import officialData from "\.\/official-data\.json"/);
   assert.match(data, /hydrateOfficialData/);
+  assert.match(data, /hydratePrefecturalData/);
+  assert.match(data, /allPrefectures/);
   assert.match(officialData, /一般市Ⅰ－１/);
   assert.match(officialData, /北山村/);
   const parsedOfficialData = JSON.parse(officialData);
   assert.equal(new Set(parsedOfficialData.municipalities.map((item) => item.p)).size, 47);
   assert.ok(parsedOfficialData.municipalities.every((item) => !("size" in item) && !("pe" in item.comp)));
+  const parsedPrefecturalData = JSON.parse(prefecturalData);
+  assert.equal(parsedPrefecturalData.prefectures.length, 47);
+  assert.equal(parsedPrefecturalData.prefectures.find((item) => item.c === "30").n, "和歌山県");
   assert.match(generator, /finance_data_table_groups\.csv/);
   assert.match(generator, /finance_local_finance_data_table_flow\.csv/);
   assert.doesNotMatch(worker, /no-store, no-cache, must-revalidate/);
+  assert.match(worker, /prefectural-data\.json/);
   assert.match(worker, /stale-while-revalidate/);
 });

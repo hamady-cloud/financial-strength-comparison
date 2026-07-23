@@ -1,0 +1,16 @@
+{
+  "snapshot": "2026-05-26",
+  "generatedAt": "2026-07-23T04:15:12.985Z",
+  "source": "デジタル庁『地方財政（都道府県ごと）』・総務省",
+  "sourceUrl": "https://www.digital.go.jp/resources/japandashboard/prefectural-finance",
+  "healthRatioSnapshot": "2025-11-28",
+  "healthRatioSource": "総務省『健全化判断比率・資金不足比率（確報）』",
+  "healthRatioSourceUrl": "https://www.soumu.go.jp/menu_news/s-news/01zaisei07_02000434.html",
+  "years": [
+    2020,
+    2021,
+    2022,
+    2023,
+    2024
+  ]
+}

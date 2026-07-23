@@ -1,5 +1,6 @@
 {
   "municipalFinancePageUrl": "https://www.digital.go.jp/resources/japandashboard/municipal-finance",
+  "prefecturalFinancePageUrl": "https://www.digital.go.jp/resources/japandashboard/prefectural-finance",
   "rollingYears": 5,
   "eStat": {
     "apiUrl": "https://dashboard.e-stat.go.jp/api/1.0/Json/getData?Lang=JP&IndicatorCode=1302050000001120010,1302050000001220010&RegionalRank=4&Cycle=4&IsSeasonalAdjustment=1&MetaGetFlg=Y&SectionHeaderFlg=1",
@@ -15,6 +16,33 @@
     "2024": {
       "pageUrl": "https://www.soumu.go.jp/menu_news/s-news/01zaisei07_02000434.html",
       "publishedAt": "2025-11-28"
+    }
+  },
+  "prefecturalAnnualHealthRatios": {
+    "2020": {
+      "pageUrl": "https://www.soumu.go.jp/menu_news/s-news/01zaisei07_02000311.html",
+      "publishedAt": "2021-11-30",
+      "allClear": true
+    },
+    "2021": {
+      "pageUrl": "https://www.soumu.go.jp/menu_news/s-news/01zaisei07_02000347.html",
+      "publishedAt": "2022-11-30",
+      "allClear": true
+    },
+    "2022": {
+      "pageUrl": "https://www.soumu.go.jp/menu_news/s-news/01zaisei07_02000388.html",
+      "publishedAt": "2023-11-28",
+      "allClear": true
+    },
+    "2023": {
+      "pageUrl": "https://www.soumu.go.jp/menu_news/s-news/01zaisei07_02000409.html",
+      "publishedAt": "2024-11-29",
+      "allClear": true
+    },
+    "2024": {
+      "pageUrl": "https://www.soumu.go.jp/menu_news/s-news/01zaisei07_02000434.html",
+      "publishedAt": "2025-11-28",
+      "allClear": true
     }
   }
 }

@@ -1,14 +1,10 @@
 import officialDataMeta from "./official-data-meta.json";
+import prefecturalDataMeta from "./prefectural-data-meta.json";
 
+export type Scope = "municipality" | "prefecture";
 export type MetricKey =
-  | "fiscalStrength"
-  | "ordinaryBalance"
-  | "debtService"
-  | "futureBurden"
-  | "actualDeficit"
-  | "consolidatedDeficit"
-  | "fundBalance"
-  | "personnel";
+  | "fiscalStrength" | "ordinaryBalance" | "debtService" | "futureBurden"
+  | "actualDeficit" | "consolidatedDeficit" | "fundBalance" | "personnel";
 
 type MetricSeries = Record<MetricKey, Array<number | null>>;
 
@@ -16,6 +12,7 @@ export type Municipality = {
   code: string;
   name: string;
   pref: string;
+  scope: Scope;
   groups: Array<string | null>;
   populations: Array<number | null>;
   history: MetricSeries;
@@ -27,7 +24,7 @@ export type Municipality = {
   };
 };
 
-type CompactMunicipality = {
+type CompactEntity = {
   c: string;
   n: string;
   p: string;
@@ -36,11 +33,8 @@ type CompactMunicipality = {
   v: Record<"f" | "o" | "d" | "b" | "a" | "c" | "r" | "pe", Array<number | null>>;
   comp: Record<"a" | "d" | "o", Array<number | null>>;
 };
-
-type OfficialDataPayload = {
-  groupAverages: Record<string, Partial<Record<"f" | "o" | "d" | "b", Array<number | null>>>>;
-  municipalities: CompactMunicipality[];
-};
+type GroupAverages = Record<string, Partial<Record<"f" | "o" | "d" | "b", Array<number | null>>>>;
+type DataPayload = { groupAverages: GroupAverages; municipalities?: CompactEntity[]; prefectures?: CompactEntity[] };
 
 export const years = officialDataMeta.years;
 export const dataSnapshot = officialDataMeta.snapshot;
@@ -50,6 +44,9 @@ export const dataSourceUrl = officialDataMeta.sourceUrl;
 export const healthRatioSnapshot = officialDataMeta.healthRatioSnapshot;
 export const healthRatioSource = officialDataMeta.healthRatioSource;
 export const healthRatioSourceUrl = officialDataMeta.healthRatioSourceUrl;
+export const prefecturalDataSnapshot = prefecturalDataMeta.snapshot;
+export const prefecturalDataGeneratedAt = prefecturalDataMeta.generatedAt;
+export const prefecturalDataSourceUrl = prefecturalDataMeta.sourceUrl;
 
 export const metrics: Record<MetricKey, { label: string; unit: string; better: "high" | "low"; digits: number; official: boolean }> = {
   fiscalStrength: { label: "財政力指数", unit: "", better: "high", digits: 2, official: true },
@@ -64,63 +61,61 @@ export const metrics: Record<MetricKey, { label: string; unit: string; better: "
 
 export const allMunicipalities: Municipality[] = [];
 export const municipalities: Municipality[] = [];
-const compactGroupAverages: OfficialDataPayload["groupAverages"] = {};
+export const allPrefectures: Municipality[] = [];
+const groupAveragesByScope: Record<Scope, GroupAverages> = { municipality: {}, prefecture: {} };
 
-export function hydrateOfficialData(input: unknown) {
-  if (!input || typeof input !== "object") throw new Error("公式データの形式が正しくありません。");
-  const payload = input as Partial<OfficialDataPayload>;
-  if (!Array.isArray(payload.municipalities) || !payload.groupAverages) throw new Error("公式データに必要な項目がありません。");
-
-  for (const key of Object.keys(compactGroupAverages)) delete compactGroupAverages[key];
-  Object.assign(compactGroupAverages, payload.groupAverages);
-  const parsedMunicipalities = payload.municipalities.map((record) => ({
+function parseEntities(records: CompactEntity[], scope: Scope): Municipality[] {
+  return records.map((record) => ({
     code: record.c,
     name: record.n,
     pref: record.p,
+    scope,
     groups: record.g,
     populations: record.pop,
     history: {
-      fiscalStrength: record.v.f,
-      ordinaryBalance: record.v.o,
-      debtService: record.v.d,
-      futureBurden: record.v.b,
-      actualDeficit: record.v.a,
-      consolidatedDeficit: record.v.c,
-      fundBalance: record.v.r,
-      personnel: record.v.pe,
+      fiscalStrength: record.v.f, ordinaryBalance: record.v.o, debtService: record.v.d,
+      futureBurden: record.v.b, actualDeficit: record.v.a, consolidatedDeficit: record.v.c,
+      fundBalance: record.v.r, personnel: record.v.pe,
     },
     composition: {
-      personnel: record.v.pe,
-      assistance: record.comp.a,
-      debt: record.comp.d,
-      other: record.comp.o,
+      personnel: record.v.pe, assistance: record.comp.a, debt: record.comp.d, other: record.comp.o,
     },
   }));
-  allMunicipalities.splice(0, allMunicipalities.length, ...parsedMunicipalities);
-  municipalities.splice(0, municipalities.length, ...parsedMunicipalities.filter((item) => item.pref === "和歌山県"));
+}
+
+function replaceAverages(scope: Scope, averages: GroupAverages) {
+  const target = groupAveragesByScope[scope];
+  for (const key of Object.keys(target)) delete target[key];
+  Object.assign(target, averages);
+}
+
+export function hydrateOfficialData(input: unknown) {
+  if (!input || typeof input !== "object") throw new Error("公式データの形式が正しくありません。");
+  const payload = input as Partial<DataPayload>;
+  if (!Array.isArray(payload.municipalities) || !payload.groupAverages) throw new Error("市町村データに必要な項目がありません。");
+  replaceAverages("municipality", payload.groupAverages);
+  const parsed = parseEntities(payload.municipalities, "municipality");
+  allMunicipalities.splice(0, allMunicipalities.length, ...parsed);
+  municipalities.splice(0, municipalities.length, ...parsed.filter((item) => item.pref === "和歌山県"));
+}
+
+export function hydratePrefecturalData(input: unknown) {
+  if (!input || typeof input !== "object") throw new Error("都道府県データの形式が正しくありません。");
+  const payload = input as Partial<DataPayload>;
+  if (!Array.isArray(payload.prefectures) || !payload.groupAverages) throw new Error("都道府県データに必要な項目がありません。");
+  replaceAverages("prefecture", payload.groupAverages);
+  allPrefectures.splice(0, allPrefectures.length, ...parseEntities(payload.prefectures, "prefecture"));
 }
 
 export function indexForYear(year: number) {
   const index = years.indexOf(year);
   return index >= 0 ? index : years.length - 1;
 }
-
-export function groupAt(item: Municipality, year = years[years.length - 1]) {
-  return item.groups[indexForYear(year)] ?? "区分なし";
-}
-
-export function populationAt(item: Municipality, year = years[years.length - 1]) {
-  return item.populations[indexForYear(year)] ?? 0;
-}
-
-export function metricValue(item: Municipality, metric: MetricKey, year = years[years.length - 1]) {
-  return item.history[metric][indexForYear(year)] ?? null;
-}
-
-export function metricHistory(item: Municipality, metric: MetricKey, throughYear = years[years.length - 1]) {
-  return item.history[metric].slice(0, indexForYear(throughYear) + 1);
-}
-
+export function groupAt(item: Municipality, year = years.at(-1)!) { return item.groups[indexForYear(year)] ?? "区分なし"; }
+export function populationAt(item: Municipality, year = years.at(-1)!) { return item.populations[indexForYear(year)] ?? 0; }
+export function metricValue(item: Municipality, metric: MetricKey, year = years.at(-1)!) { return item.history[metric][indexForYear(year)] ?? null; }
+export function metricHistory(item: Municipality, metric: MetricKey, throughYear = years.at(-1)!) { return item.history[metric].slice(0, indexForYear(throughYear) + 1); }
+export function isDeficitMetric(key: MetricKey) { return key === "actualDeficit" || key === "consolidatedDeficit"; }
 export function formatMetric(value: number | null, key: MetricKey) {
   if (value == null || !Number.isFinite(value)) return "—";
   if (isDeficitMetric(key) && value === 0) return "赤字なし";
@@ -128,49 +123,33 @@ export function formatMetric(value: number | null, key: MetricKey) {
   return `${value.toFixed(meta.digits)}${meta.unit}`;
 }
 
-export function isDeficitMetric(key: MetricKey) {
-  return key === "actualDeficit" || key === "consolidatedDeficit";
-}
-
 const officialMetricCodes: Partial<Record<MetricKey, "f" | "o" | "d" | "b">> = {
-  fiscalStrength: "f",
-  ordinaryBalance: "o",
-  debtService: "d",
-  futureBurden: "b",
+  fiscalStrength: "f", ordinaryBalance: "o", debtService: "d", futureBurden: "b",
 };
-
-export function benchmarkFor(item: Municipality, key: MetricKey, year = years[years.length - 1]) {
+export function benchmarkFor(item: Municipality, key: MetricKey, year = years.at(-1)!) {
   if (isDeficitMetric(key)) return null;
   const index = indexForYear(year);
   const group = groupAt(item, year);
   const officialCode = officialMetricCodes[key];
-  const officialAverage = officialCode ? compactGroupAverages[group]?.[officialCode]?.[index] : null;
+  const officialAverage = officialCode ? groupAveragesByScope[item.scope][group]?.[officialCode]?.[index] : null;
   if (officialAverage != null) return officialAverage;
-  const values = allMunicipalities
-    .filter((candidate) => groupAt(candidate, year) === group)
+  const source = item.scope === "municipality" ? allMunicipalities : allPrefectures;
+  const values = source.filter((candidate) => groupAt(candidate, year) === group)
     .map((candidate) => metricValue(candidate, key, year))
     .filter((value): value is number => value != null);
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
 }
 
-export function compositionAt(item: Municipality, year = years[years.length - 1]) {
+export function compositionAt(item: Municipality, year = years.at(-1)!) {
   const index = indexForYear(year);
   return {
-    personnel: item.composition.personnel[index] ?? null,
-    assistance: item.composition.assistance[index] ?? null,
-    debt: item.composition.debt[index] ?? null,
-    other: item.composition.other[index] ?? null,
+    personnel: item.composition.personnel[index] ?? null, assistance: item.composition.assistance[index] ?? null,
+    debt: item.composition.debt[index] ?? null, other: item.composition.other[index] ?? null,
   };
 }
-
-export function causeAt(item: Municipality, year = years[years.length - 1]) {
+export function causeAt(item: Municipality, year = years.at(-1)!) {
   const composition = compositionAt(item, year);
-  const candidates = [
-    ["人件費型", composition.personnel],
-    ["扶助費型", composition.assistance],
-    ["公債費型", composition.debt],
-  ] as const;
+  const candidates = [["人件費型", composition.personnel], ["扶助費型", composition.assistance], ["公債費型", composition.debt]] as const;
   const available = candidates.filter((candidate): candidate is readonly [typeof candidate[0], number] => candidate[1] != null);
-  if (!available.length) return "データなし";
-  return [...available].sort((a, b) => b[1] - a[1])[0][0];
+  return available.length ? [...available].sort((a, b) => b[1] - a[1])[0][0] : "データなし";
 }
