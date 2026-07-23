@@ -25,8 +25,9 @@ test("renders the fiscal dashboard shell", async () => {
 });
 
 test("keeps data and methodology labels explicit", async () => {
-  const [dashboard, data, officialData, prefecturalData, generator, worker] = await Promise.all([
+  const [dashboard, styles, data, officialData, prefecturalData, generator, worker] = await Promise.all([
     readFile(new URL("../app/Dashboard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/data.ts", import.meta.url), "utf8"),
     readFile(new URL("../public/official-data.json", import.meta.url), "utf8"),
     readFile(new URL("../public/prefectural-data.json", import.meta.url), "utf8"),
@@ -71,6 +72,11 @@ test("keeps data and methodology labels explicit", async () => {
   assert.match(dashboard, /長野県 王滝村/);
   assert.doesNotMatch(dashboard, /中学生にもわかる/);
   assert.doesNotMatch(dashboard, /かんたんな意味/);
+  assert.match(dashboard, /className="keep-line"/);
+  assert.match(styles, /\.keep-line \{ white-space:nowrap; \}/);
+  assert.match(styles, /\.risk-threshold-table td:nth-child\(2\).*white-space:nowrap/);
+  assert.match(styles, /\.impact-grid li .*white-space:nowrap/);
+  assert.match(styles, /\.non-events ul .*repeat\(3,minmax\(0,1fr\)\)/);
   assert.match(dashboard, /laws\.e-gov\.go\.jp\/law\/419AC0000000094/);
   assert.match(data, /metricHistory/);
   assert.match(data, /groupAt/);

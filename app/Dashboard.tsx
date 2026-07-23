@@ -580,7 +580,7 @@ function BeginnerGuide({ scope }: { scope: Scope }) {
     <PageIntro eyebrow="FISCAL BASICS" title="やさしい指標解説" text="はじめて財政を見る人のために、計算方法と数字の意味を、身近な例で説明します。" />
 
     <div className="guide-hero">
-      <div className="guide-lead"><span className="guide-kicker">まず、ここだけ覚えよう</span><h2>{isPrefecture ? "都道府県" : "市町村"}の財政は、<br />「地域の大きな家計簿」です。</h2><p>{isPrefecture ? <>都道府県は、<strong>税金や国からのお金</strong>を受け取り、高校、警察、広域道路、災害対応、医療の調整などに使います。</> : <>市町村は、<strong>税金や国からのお金</strong>を受け取り、小学校・中学校、道路、ごみ収集、消防、福祉などに使います。</>}</p><p><em>普通の家計と違い、利益を出すことが目的ではありません。</em><br />住民に必要なサービスを続けながら、急な災害や将来の負担にも備える必要があります。</p></div>
+      <div className="guide-lead"><span className="guide-kicker">まず、ここだけ覚えよう</span><h2>{isPrefecture ? "都道府県" : "市町村"}の財政は、<br /><span className="keep-line">「地域の大きな家計簿」です。</span></h2><p>{isPrefecture ? <>都道府県は、<strong>税金や国からのお金</strong>を受け取り、高校、警察、広域道路、災害対応、医療の調整などに使います。</> : <>市町村は、<strong>税金や国からのお金</strong>を受け取り、小学校・中学校、道路、ごみ収集、消防、福祉などに使います。</>}</p><p><em>普通の家計と違い、利益を出すことが目的ではありません。</em><br />住民に必要なサービスを続けながら、急な災害や将来の負担にも備える必要があります。</p></div>
       <div className="household-map"><div><span>地域の収入</span><b>税金・地方交付税など</b><small>家計なら「給料」に近い</small></div><i>→</i><div><span>地域の支出</span><b>{isPrefecture ? "教育・警察・広域道路など" : "教育・福祉・道路など"}</b><small>家計なら「生活費」に近い</small></div><i>＋</i><div><span>将来への備え</span><b>基金・借金の管理</b><small>家計なら「貯金とローン」</small></div></div>
     </div>
 
@@ -634,7 +634,7 @@ function FiscalRiskGuide() {
     <PageIntro eyebrow="FISCAL HEALTH LAW" title="財政が悪いと、どうなる？" text="財政指標が基準を超えたとき、自治体の運営と住民生活がどう変わるのかを、制度と実例から整理します。" />
 
     <div className="risk-hero">
-      <div className="risk-lead"><span>まず、ここだけ押さえよう</span><h2>財政悪化は、<br />「まちの予算の自由」が<br />小さくなることです。</h2><p>基準を超えると、赤字の解消や借金返済を優先した立て直しが始まります。自治体が突然なくなったり、翌日からすべてのサービスが止まったりする制度ではありません。</p><p><em>重くなるほど、住民のために新しいことを選べる余地が小さくなります。</em></p></div>
+      <div className="risk-lead"><span>まず、ここだけ押さえよう</span><h2>財政悪化は、<br /><span className="keep-line">「まちの予算の自由」が小さくなることです。</span></h2><p>基準を超えると、赤字の解消や借金返済を優先した立て直しが始まります。自治体が突然なくなったり、翌日からすべてのサービスが止まったりする制度ではありません。</p><p><em>重くなるほど、住民のために新しいことを選べる余地が小さくなります。</em></p></div>
       <div className="risk-flow"><div><small>通常</small><b>毎年チェック</b><p>4つの比率を議会と住民に公表</p></div><i>→</i><div className="yellow"><small>イエロー</small><b>早期健全化</b><p>自治体主導で計画的に立て直す</p></div><i>→</i><div className="red"><small>レッド</small><b>財政再生</b><p>国の強い関与のもとで再生する</p></div></div>
     </div>
 
