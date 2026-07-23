@@ -3,6 +3,11 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const workflow = await readFile(new URL("../.github/workflows/annual-data-update.yml", import.meta.url), "utf8");
+const keepaliveWorkflow = await readFile(
+  new URL("../.github/workflows/keep-scheduled-workflows-active.yml", import.meta.url),
+  "utf8",
+);
+const vercelConfig = JSON.parse(await readFile(new URL("../vercel.json", import.meta.url), "utf8"));
 const annualScript = await readFile(new URL("../scripts/prepare-annual-update.mjs", import.meta.url), "utf8");
 
 test("annual workflow has scheduled and manual entry points", () => {
@@ -38,4 +43,16 @@ test("annual preparation restores files when no new semantic data exists", () =>
   assert.match(annualScript, /after\.municipal !== after\.prefectural/);
   assert.match(annualScript, /update-official-data\.mjs/);
   assert.match(annualScript, /update-prefectural-data\.mjs/);
+});
+
+test("public repository keeps scheduled workflows active without rebuilding Vercel", () => {
+  assert.match(keepaliveWorkflow, /schedule:/);
+  assert.match(keepaliveWorkflow, /cron: "23 4 1 \* \*"/);
+  assert.match(keepaliveWorkflow, /workflow_dispatch:/);
+  assert.match(keepaliveWorkflow, /contents: write/);
+  assert.match(keepaliveWorkflow, /actions\/checkout@[0-9a-f]{40} # v6\.0\.2/);
+  assert.match(keepaliveWorkflow, /git commit --allow-empty/);
+  assert.match(keepaliveWorkflow, /\[skip ci\]/);
+  assert.match(keepaliveWorkflow, /git push origin/);
+  assert.equal(vercelConfig.ignoreCommand, "git diff --quiet HEAD^ HEAD");
 });
