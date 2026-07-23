@@ -6,16 +6,19 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "vinext dev",
-    "build": "vinext build",
-    "start": "vinext start",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "dev:sites": "vinext dev",
+    "build:sites": "vinext build",
+    "start:sites": "vinext start",
     "data:update": "node scripts/update-official-data.mjs",
     "data:update:prefectures": "node scripts/update-prefectural-data.mjs",
     "data:update:annual": "node scripts/prepare-annual-update.mjs",
     "data:check": "node scripts/validate-official-data.mjs public/official-data.json",
     "data:check:prefectures": "node scripts/validate-prefectural-data.mjs public/prefectural-data.json",
     "test:data": "node --test tests/official-data.test.mjs tests/prefectural-data.test.mjs tests/annual-update-workflow.test.mjs",
-    "test": "npm run data:check && npm run data:check:prefectures && npm run test:data && npm run build && node --test tests/rendered-html.test.mjs",
+    "test": "npm run data:check && npm run data:check:prefectures && npm run test:data && npm run build:sites && node --test tests/rendered-html.test.mjs && npm run build",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },
   "dependencies": {
