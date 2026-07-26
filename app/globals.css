@@ -83,6 +83,9 @@ td { padding: 12px; font-size: 11px; border-top: 1px solid #edf0ee; vertical-ali
 tbody tr:hover { background: #fcfdfb; }
 .rank { display: grid; place-items: center; width: 25px; height: 25px; color: var(--muted); font: 600 11px Georgia, serif; }
 .rank.top { background: var(--ink); color: white; }
+.rank.flat { color: var(--muted); opacity: .55; }
+.rank-note { margin: 6px 0 0 !important; color: #9db3bd !important; font-size: 9px !important; }
+.map-note { margin: 8px 0 0; color: #9db3bd; font-size: 9px; line-height: 1.7; }
 .entity { border: 0; background: transparent; padding: 0; text-align: left; cursor: pointer; color: var(--ink); }
 .entity b, .entity small { display: block; white-space: nowrap; }
 .entity b { font-size: 12px; }
