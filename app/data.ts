@@ -125,6 +125,8 @@ const zeroLabels: Partial<Record<MetricKey, string>> = {
   consolidatedDeficit: "赤字なし",
   futureBurden: "負担なし",
 };
+/** 0 が「該当なし」を意味する指標か。ゲージを0幅にする判定などに使う。 */
+export function isNoneAtZero(key: MetricKey) { return key in zeroLabels; }
 export function formatMetric(value: number | null, key: MetricKey) {
   if (value == null || !Number.isFinite(value)) return "—";
   const zeroLabel = zeroLabels[key];

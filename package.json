@@ -9,17 +9,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "dev:sites": "vinext dev",
-    "build:sites": "vinext build",
-    "start:sites": "vinext start",
     "data:update": "node scripts/update-official-data.mjs",
     "data:update:prefectures": "node scripts/update-prefectural-data.mjs",
     "data:update:annual": "node scripts/prepare-annual-update.mjs",
     "data:check": "node scripts/validate-official-data.mjs public/official-data.json",
     "data:check:prefectures": "node scripts/validate-prefectural-data.mjs public/prefectural-data.json",
     "test:data": "node --test tests/official-data.test.mjs tests/prefectural-data.test.mjs tests/annual-update-workflow.test.mjs",
-    "test": "npm run data:check && npm run data:check:prefectures && npm run test:data && npm run build:sites && node --test tests/rendered-html.test.mjs && npm run build",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
+    "test": "npm run data:check && npm run data:check:prefectures && npm run test:data && npm run build && node --test tests/rendered-html.test.mjs",
+    "lint": "eslint . --ignore-pattern .next"
   },
   "dependencies": {
     "next": "16.2.6",
@@ -27,20 +24,13 @@
     "react-dom": "19.2.6"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.37.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "6.0.2",
-    "@vitejs/plugin-rsc": "0.5.26",
-    "exceljs": "4.4.0",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
-    "react-server-dom-webpack": "19.2.6",
-    "typescript": "5.9.3",
-    "vinext": "0.0.50",
-    "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "exceljs": "4.4.0",
+    "typescript": "5.9.3"
   },
   "type": "module"
 }
