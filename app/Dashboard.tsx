@@ -654,7 +654,7 @@ function FiscalRiskGuide() {
       <div className="risk-flow"><div><small>通常</small><b>毎年チェック</b><p>4つの比率を議会と住民に公表</p></div><i>→</i><div className="yellow"><small>イエロー</small><b>早期健全化</b><p>自治体主導で計画的に立て直す</p></div><i>→</i><div className="red"><small>レッド</small><b>財政再生</b><p>国の強い関与のもとで再生する</p></div></div>
     </div>
 
-    <figure className="risk-visual"><div><span className="eyebrow">VISUAL GUIDE</span><h2>全体像を、1枚で確認する</h2><p>自治体のお金の流れから、早期健全化・財政再生、住民生活への影響までを図解しています。画像を押すと大きく表示できます。</p></div><a href="/fiscal-risk-guide.png" target="_blank" rel="noreferrer"><img src="/fiscal-risk-guide.png" alt="財政が悪化した場合の自治体の対応と住民生活への影響をまとめた図解" loading="lazy" decoding="async" /></a><figcaption>※ 実際の対応は、悪化した原因、赤字額、人口、施設数、国・都道府県の支援などによって異なります。</figcaption></figure>
+    <figure className="risk-visual"><div><span className="eyebrow">VISUAL GUIDE</span><h2>全体像を、1枚で確認する</h2><p>自治体のお金の流れから、早期健全化・財政再生、住民生活への影響までを図解しています。画像を押すと大きく表示できます。</p></div><a href="/fiscal-risk-guide.webp" target="_blank" rel="noreferrer"><img src="/fiscal-risk-guide.webp" alt="財政が悪化した場合の自治体の対応と住民生活への影響をまとめた図解" loading="lazy" decoding="async" /></a><figcaption>※ 実際の対応は、悪化した原因、赤字額、人口、施設数、国・都道府県の支援などによって異なります。</figcaption></figure>
 
     <div className="risk-key"><span>基準の読み方</span><div><b>この法律の比率は、基本的に高いほど要注意です。</b><p>「基準を下回ると危ない」のではありません。表の基準と同じか、それより高くなると法律上の手続きが始まります。</p></div></div>
 

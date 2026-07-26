@@ -62,7 +62,7 @@ test("keeps data and methodology labels explicit", async () => {
   assert.match(dashboard, /赤字なし/);
   assert.match(dashboard, /自治体が自ら立て直す段階/);
   assert.match(dashboard, /自治体だけでは立て直しが難しい段階/);
-  assert.match(dashboard, /fiscal-risk-guide\.png/);
+  assert.match(dashboard, /fiscal-risk-guide\.webp/);
   assert.match(dashboard, /夕張市で、実際に起きたこと/);
   assert.match(dashboard, /中学校3/);
   assert.match(dashboard, /小学校6/);
