@@ -93,7 +93,9 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const year = new Date().getUTCFullYear();
+            // ジョブは TZ=Asia/Tokyo で動くため、日本時間の年で採番する
+            // （UTCだと1月1日早朝の失敗が前年のIssueにまとめられてしまう）
+            const year = new Date().getFullYear();
             const title = `[自動更新失敗] 地方財政データ ${year}`;
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const body = [
