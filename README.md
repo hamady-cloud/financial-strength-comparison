@@ -125,6 +125,7 @@ npm test
 - `public/prefectural-data.json`: 初回表示後に取得する都道府県公式データ
 - `app/official-data-meta.json`: 初期画面に必要な年度・取得日・出典だけを持つ軽量メタデータ
 - `app/prefectural-data-meta.json`: 都道府県版の軽量メタデータ
+- `next.config.ts`: セキュリティヘッダとキャッシュ方針（配信ポリシーはここに一本化）
 - `.github/workflows/annual-data-update.yml`: 年次自動更新、検査、コミット、失敗通知
 
 ## 更新時の注意
