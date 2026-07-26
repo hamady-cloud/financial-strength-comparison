@@ -142,15 +142,28 @@ await forEachCsv("finance_data_table_stock.csv", (row) => {
   ensureRecord(row)._funds[index] += numberOrNull(row["値_千円"]) ?? 0;
 });
 
+// 歳出構成比の分母と公債費は「歳出 (目的)」から取る。
+// 市町村版CSVの「歳出 (性質)」ブロックには2点の欠陥がある（都道府県版CSVには無い）。
+//   1. 大項目「公債費」の値が、実際には目的別「災害復旧費」の値になっている
+//      （2026-04-24版で8,705件中8,593件＝98.7%が完全一致）
+//   2. 繰出金・投資及び出資金・貸付金を欠き、歳出総額を再現しない
+//      （目的別合計より中央値9.5%小さい。1%以内に収まるのは421件のみ）
+// 目的別合計は歳入合計との比が中央値1.003で、歳出総額として妥当と確認済み。
+// 人件費・扶助費は目的別に存在しないため性質別のまま使う（分類混在は出典画面に明記）。
 await forEachCsv("finance_local_finance_data_table_flow.csv", (row) => {
   const index = yearIndex(row["年度"]);
-  if (index < 0 || row["分類"] !== "歳出 (性質)") return;
+  if (index < 0) return;
+  const category = row["分類"];
+  if (category !== "歳出 (性質)" && category !== "歳出 (目的)") return;
   const value = numberOrNull(row["値_千円"]) ?? 0;
   const flow = ensureRecord(row)._flow[index];
-  flow.total += value;
+  if (category === "歳出 (目的)") {
+    flow.total += value;
+    if (row["大項目"] === "公債費") flow.debt += value;
+    return;
+  }
   if (row["大項目"] === "人件費") flow.personnel += value;
   if (row["大項目"] === "扶助費") flow.assistance += value;
-  if (row["大項目"] === "公債費") flow.debt += value;
 });
 
 for (const record of records.values()) {
