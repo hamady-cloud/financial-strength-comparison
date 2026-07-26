@@ -116,11 +116,40 @@ export function populationAt(item: Municipality, year = years.at(-1)!) { return 
 export function metricValue(item: Municipality, metric: MetricKey, year = years.at(-1)!) { return item.history[metric][indexForYear(year)] ?? null; }
 export function metricHistory(item: Municipality, metric: MetricKey, throughYear = years.at(-1)!) { return item.history[metric].slice(0, indexForYear(throughYear) + 1); }
 export function isDeficitMetric(key: MetricKey) { return key === "actualDeficit" || key === "consolidatedDeficit"; }
+
+// 0 が「測定された0」ではなく「該当なし」を意味する指標。
+// 赤字比率は公表値「－」＝赤字なし、将来負担比率は「－」＝将来負担額が
+// 充当可能財源等を下回る（負担なし）を、それぞれ 0 として保持している。
+const zeroLabels: Partial<Record<MetricKey, string>> = {
+  actualDeficit: "赤字なし",
+  consolidatedDeficit: "赤字なし",
+  futureBurden: "負担なし",
+};
 export function formatMetric(value: number | null, key: MetricKey) {
   if (value == null || !Number.isFinite(value)) return "—";
-  if (isDeficitMetric(key) && value === 0) return "赤字なし";
+  const zeroLabel = zeroLabels[key];
+  if (zeroLabel && value === 0) return zeroLabel;
   const meta = metrics[key];
   return `${value.toFixed(meta.digits)}${meta.unit}`;
+}
+
+// 同順位を正しく扱う順位計算。値の刻みが粗い指標（経常収支比率は1,741団体に対し
+// 相異値49種）では同値が大量に発生するため、配列順で順位を決めてはいけない。
+export function rankWithin(list: Municipality[], target: Municipality, key: MetricKey, year: number) {
+  const value = metricValue(target, key, year);
+  if (value == null) return null;
+  const better = metrics[key].better === "low"
+    ? (candidate: number) => candidate < value
+    : (candidate: number) => candidate > value;
+  let ahead = 0;
+  let tied = 0;
+  for (const item of list) {
+    const candidate = metricValue(item, key, year);
+    if (candidate == null) continue;
+    if (better(candidate)) ahead += 1;
+    else if (candidate === value) tied += 1;
+  }
+  return { rank: ahead + 1, tied };
 }
 
 const officialMetricCodes: Partial<Record<MetricKey, "f" | "o" | "d" | "b">> = {

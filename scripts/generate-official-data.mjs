@@ -166,8 +166,16 @@ await forEachCsv("finance_local_finance_data_table_flow.csv", (row) => {
   if (row["大項目"] === "扶助費") flow.assistance += value;
 });
 
+// 将来負担比率は、将来負担額が充当可能財源等を下回る団体（＝負担なし）の行が
+// 公表CSVに存在しない。総務省の公表資料では「－」にあたり、値の欠落ではない。
+// 行の欠落を欠損として扱うと、最も健全な団体がランキングや散布図から消えるため 0 とする。
+// ただしその年度に1件も行が無い場合は公表遅れ等が疑われるので欠損のまま残す。
+const futureBurdenReported = years.map((_, index) =>
+  [...records.values()].some((record) => record.v.b[index] != null));
+
 for (const record of records.values()) {
   for (let index = 0; index < years.length; index += 1) {
+    if (record.v.b[index] == null && futureBurdenReported[index]) record.v.b[index] = 0;
     const size = record._size[index];
     if (size && record._funds[index] >= 0) record.v.r[index] = Number((record._funds[index] / size * 100).toFixed(1));
     const flow = record._flow[index];

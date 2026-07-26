@@ -75,6 +75,16 @@ for (const [label, values, low, high] of plausibleRanges) {
     `${label}構成比の中央値が想定範囲外です: ${center}%（想定 ${low}〜${high}%）。源泉CSVの分類・大項目の対応を確認してください`);
 }
 
+// 将来負担比率は「負担なし」を 0 として持つ（公表CSVに行が無い団体）。
+// 全団体が欠損なら公表遅れ、ゼロが極端に多い／少ないなら公表様式の変更を疑う。
+const burdenMissing = municipalities.filter((item) => !Number.isFinite(item.v.b[latest])).length;
+check(burdenMissing === 0,
+  `将来負担比率が欠損している団体があります: ${burdenMissing}/${municipalities.length}。公表遅れか、源泉CSVの様式変更を確認してください`);
+const noBurden = municipalities.filter((item) => item.v.b[latest] === 0).length;
+const noBurdenRate = noBurden / municipalities.length;
+check(noBurdenRate >= 0.2 && noBurdenRate <= 0.85,
+  `将来負担なし（0）の団体割合が想定範囲外です: ${(noBurdenRate * 100).toFixed(1)}%（想定 20〜85%）`);
+
 const zeroDebt = municipalities.filter((item) => item.comp.d[latest] === 0).length;
 check(zeroDebt <= municipalities.length * 0.1,
   `公債費構成比がゼロの団体が多すぎます: ${zeroDebt}/${municipalities.length}。源泉CSVの列対応が変わった可能性があります`);
