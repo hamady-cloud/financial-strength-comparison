@@ -52,6 +52,33 @@ for (const item of municipalities) {
   }
 }
 
+// 分布の妥当性検査。
+// 構成比は同じ分母で割る以上、値が壊れていても合計は必ず100%になるため、
+// 「合計100%」のチェックだけでは源泉データの値ズレを検知できない。
+// 実際に、市町村版CSVの性質別「公債費」が目的別「災害復旧費」の値になっていた事故を
+// 合計チェックが素通りさせた（中央値0.1%、本来8%前後）。水準そのものを見張る。
+function median(values) {
+  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
+  return sorted.length ? sorted[Math.floor(sorted.length / 2)] : null;
+}
+
+const latest = data.years.length - 1;
+const plausibleRanges = [
+  ["人件費", municipalities.map((item) => item.v.pe[latest]), 8, 22],
+  ["扶助費", municipalities.map((item) => item.comp.a[latest]), 5, 30],
+  ["公債費", municipalities.map((item) => item.comp.d[latest]), 3, 18],
+  ["その他", municipalities.map((item) => item.comp.o[latest]), 40, 80],
+];
+for (const [label, values, low, high] of plausibleRanges) {
+  const center = median(values);
+  check(center != null && center >= low && center <= high,
+    `${label}構成比の中央値が想定範囲外です: ${center}%（想定 ${low}〜${high}%）。源泉CSVの分類・大項目の対応を確認してください`);
+}
+
+const zeroDebt = municipalities.filter((item) => item.comp.d[latest] === 0).length;
+check(zeroDebt <= municipalities.length * 0.1,
+  `公債費構成比がゼロの団体が多すぎます: ${zeroDebt}/${municipalities.length}。源泉CSVの列対応が変わった可能性があります`);
+
 check(Object.keys(data.groupAverages ?? {}).length >= 30, "類似団体平均の区分数が少なすぎます");
 for (const [group, averages] of Object.entries(data.groupAverages ?? {})) {
   for (const key of ["f", "o", "d", "b"]) check(averages[key]?.length === data.years.length, `${group} の平均 ${key} の年度数が不一致です`);
